@@ -429,7 +429,7 @@ mod integration_tests {
 
         let expected = include_str!("../../../fixtures/golden/minimal-package.json");
         let actual = fs::read_to_string(root.join("package.json")).unwrap();
-        assert_eq!(actual, expected);
+        assert_eq!(actual, expected.replace("\r\n", "\n"));
         assert!(root.join(".scafflare/lock.yaml").is_file());
 
         let second = preview_add(
