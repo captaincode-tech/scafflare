@@ -1,0 +1,7 @@
+/target
+/.stackforge
+.DS_Store
+*.log
+examples/**/node_modules
+examples/**/dist
+examples/**/*.db
