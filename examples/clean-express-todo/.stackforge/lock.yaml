@@ -1,0 +1,143 @@
+lockfile_version: 1
+project_name: stackforge-generated-clean
+recipes:
+- name: node
+  version: 0.1.0
+- name: typescript
+  version: 0.1.0
+- name: architecture-clean
+  version: 0.1.0
+- name: express
+  version: 0.1.0
+- name: sqlite-libsql
+  version: 0.1.0
+- name: drizzle
+  version: 0.1.0
+- name: zod
+  version: 0.1.0
+- name: pino
+  version: 0.1.0
+- name: vitest
+  version: 0.1.0
+- name: biome
+  version: 0.1.0
+- name: husky-lint-staged
+  version: 0.1.0
+- name: github-actions
+  version: 0.1.0
+variables:
+  architecture: clean
+  biome_enabled: true
+  database: sqlite
+  framework: express
+  pino_enabled: true
+  project_name: stackforge-generated-clean
+  project_pascal: StackforgeGeneratedClean
+  project_slug: stackforge-generated-clean
+  vitest_enabled: true
+  zod_enabled: true
+managed_files:
+  .env.example:
+    recipes:
+    - typescript
+    sha256: b685612e421e1570a4d050ce3c2a1d2f07dab4bb98cd04ff34a5fec18367c868
+  .github/workflows/ci.yml:
+    recipes:
+    - github-actions
+    sha256: 2206450dcb6984eb21128a4dfb8152d9b2c1a215c634b1f86c6ea90de1e56382
+  .gitignore:
+    recipes:
+    - node
+    sha256: 6ad585951873e0f46e31fbcfbe4e51193fc12f810d6f5bdd488053be38075c16
+  .husky/pre-commit:
+    recipes:
+    - husky-lint-staged
+    sha256: a0b65569bf15e6a9804cc4e2822214899cda8ccaef4c9269ae6db2abba611440
+  README.md:
+    recipes:
+    - architecture-clean
+    sha256: d9d15598e40407c3801b9e5522312e93d6de0c9b05be6df921880e487f1f2de8
+  biome.json:
+    recipes:
+    - biome
+    sha256: 6c1095628e0f6878dc2731f5dea1bcaf75b6730b76c10d83563d403d2c7e64c0
+  drizzle.config.ts:
+    recipes:
+    - drizzle
+    sha256: d8c0e10b01b76e87c22509326f9eed15fc4f95b291a947f9402c3e2a3f76f217
+  package.json:
+    recipes:
+    - biome
+    - drizzle
+    - express
+    - husky-lint-staged
+    - node
+    - pino
+    - sqlite-libsql
+    - vitest
+    - zod
+    sha256: 7742c1ff2d611e489c55dad64cb45738a23c872ed1fd9fef9d2eab7235a2110a
+  src/config/env.ts:
+    recipes:
+    - typescript
+    sha256: 54e8c0a492a7d794164cfcaa949481f121338f0a19cdcaa37cabb8bc68f4c671
+  src/database/client.ts:
+    recipes:
+    - drizzle
+    sha256: 41d83267d60731657be17c7eeda6270cea22714743fe5b7479851fff025403f9
+  src/database/drizzle-todo-repository.ts:
+    recipes:
+    - drizzle
+    sha256: a0ef665813d7acafca9245b3cc9e9b1c054c6e85bda8c9207cceb764c556ca2d
+  src/database/schema.ts:
+    recipes:
+    - drizzle
+    sha256: d8c676430c50ce61bfe3148fbf789b9651e5e197b17826dd9c2c7bbd3edc522c
+  src/logger.ts:
+    recipes:
+    - pino
+    sha256: 47e44b25751191568c3c3f9c250b3a954966ba7147030970792a2ecfcc62f980
+  src/modules/todos/controller.ts:
+    recipes:
+    - architecture-clean
+    sha256: 78d6c0587dacfad1b2e562cc89c9e6635eb86eaa1f1580ab14a067c9f2e67edd
+  src/modules/todos/domain.ts:
+    recipes:
+    - architecture-clean
+    sha256: f24187373df718668011d0b2fa9ff98c50a99fef719d116c9afaa33859856fb5
+  src/modules/todos/repository.ts:
+    recipes:
+    - architecture-clean
+    sha256: 318f035c9440be82352433ad8af60b3397036634f46de73c57a0728ebf28e874
+  src/modules/todos/routes-express.ts:
+    recipes:
+    - architecture-clean
+    sha256: 5a7074e3fce426e5171dc49fffd035c9fa2ca5e8a48f33f2b6bf39937b481b18
+  src/modules/todos/service.ts:
+    recipes:
+    - architecture-clean
+    sha256: c68228d4ad6f9a9c1ed45afe5134f39d1e0a4f1d545257bd3241a9417a198d57
+  src/server.ts:
+    recipes:
+    - express
+    sha256: 42d6cbb1c7ba73106044c3cb14d09df0171fd40cac8f75204511bf315d252bfd
+  test/integration/health.test.ts:
+    recipes:
+    - vitest
+    sha256: e07d7d3127a5463161b2c4da22f1e3d93469929db35a1a451e48627663454463
+  test/unit/todo-service.test.ts:
+    recipes:
+    - vitest
+    sha256: 38eb6c995eb6ad54433da194a44b7c6de63e5c1819b5057e67680af4c4ac3303
+  tsconfig.build.json:
+    recipes:
+    - typescript
+    sha256: daa59b36f1a9d3989570858ee4303be673fe31b462757c6a2f6a1db6e3040265
+  tsconfig.json:
+    recipes:
+    - typescript
+    sha256: bd95f078bfd2e944ff0d816931e7f4b87d0a81db818f696ffe69b881e3fe83fb
+  vitest.config.ts:
+    recipes:
+    - vitest
+    sha256: eeacb8a1a719ac1ebb7f660d93ae58a0e88781f5a0eaa38b753b3ac4bf3cee82

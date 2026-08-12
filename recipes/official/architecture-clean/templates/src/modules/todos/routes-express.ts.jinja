@@ -1,0 +1,59 @@
+import { Router, type NextFunction, type Request, type Response, type RequestHandler } from "express";
+import { z } from "zod";
+
+import { AppError, type CreateTodoInput, type UpdateTodoInput } from "./domain.js";
+import type { TodoController } from "./controller.js";
+
+const idSchema = z.coerce.number().int().positive();
+const createSchema = z.object({ title: z.string().trim().min(1).max(200) });
+const updateSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  completed: z.boolean().optional(),
+}).refine((value) => value.title !== undefined || value.completed !== undefined, "At least one field is required");
+
+const asyncHandler = (handler: (request: Request, response: Response) => Promise<void>): RequestHandler =>
+  (request: Request, response: Response, next: NextFunction) => {
+    void handler(request, response).catch(next);
+  };
+
+export function createTodoRouter(controller: TodoController): Router {
+  const router = Router();
+
+  router.post("/todos", asyncHandler(async (request, response) => {
+    const input: CreateTodoInput = createSchema.parse(request.body);
+    response.status(201).json(await controller.create(input));
+  }));
+
+  router.get("/todos", asyncHandler(async (_request, response) => {
+    response.status(200).json(await controller.list());
+  }));
+
+  router.get("/todos/:id", asyncHandler(async (request, response) => {
+    response.status(200).json(await controller.findById(idSchema.parse(request.params.id)));
+  }));
+
+  router.patch("/todos/:id", asyncHandler(async (request, response) => {
+    const input: UpdateTodoInput = updateSchema.parse(request.body);
+    response.status(200).json(await controller.update(idSchema.parse(request.params.id), input));
+  }));
+
+  router.delete("/todos/:id", asyncHandler(async (request, response) => {
+    await controller.delete(idSchema.parse(request.params.id));
+    response.status(204).end();
+  }));
+
+  return router;
+}
+
+export function errorHandler(error: unknown, _request: Request, response: Response, _next: NextFunction): void {
+  if (error instanceof z.ZodError) {
+    response.status(400).json({ error: "Validation failed", details: error.flatten() });
+    return;
+  }
+  if (error instanceof AppError) {
+    response.status(error.statusCode).json({ error: error.message, code: error.code });
+    return;
+  }
+  console.error(error);
+  response.status(500).json({ error: "Internal server error" });
+}

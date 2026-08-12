@@ -1,0 +1,48 @@
+schema_version: 1
+metadata:
+  name: architecture-clean
+  version: 0.1.0
+  description: Clean architecture with typed Todo CRUD when SQLite is selected
+depends_on:
+  - typescript
+compatible_with: []
+conflicts:
+  - architecture-minimal
+  - architecture-layered
+required_capabilities: []
+files:
+  - source: templates/src/server.ts.jinja
+    destination: src/server.ts
+    strategy: create
+    when: "framework == none"
+  - source: templates/src/modules/todos/domain.ts.jinja
+    destination: src/modules/todos/domain.ts
+    strategy: create
+    when: "database == sqlite"
+  - source: templates/src/modules/todos/repository.ts.jinja
+    destination: src/modules/todos/repository.ts
+    strategy: create
+    when: "database == sqlite"
+  - source: templates/src/modules/todos/service.ts.jinja
+    destination: src/modules/todos/service.ts
+    strategy: create
+    when: "database == sqlite"
+  - source: templates/src/modules/todos/controller.ts.jinja
+    destination: src/modules/todos/controller.ts
+    strategy: create
+    when: "database == sqlite"
+  - source: templates/src/modules/todos/routes-express.ts.jinja
+    destination: src/modules/todos/routes-express.ts
+    strategy: create
+    when: "framework == express && database == sqlite"
+  - source: templates/src/modules/todos/routes-hono.ts.jinja
+    destination: src/modules/todos/routes-hono.ts
+    strategy: create
+    when: "framework == hono && database == sqlite"
+  - source: templates/README.md.jinja
+    destination: README.md
+    strategy: create
+validation_commands:
+  - [npm, run, build]
+post_generation_instructions:
+  - Run npm run db:generate after installing dependencies.

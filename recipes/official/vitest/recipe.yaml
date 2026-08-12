@@ -1,0 +1,29 @@
+schema_version: 1
+metadata:
+  name: vitest
+  version: 0.1.0
+  description: Vitest unit and integration test baseline
+depends_on:
+  - typescript
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/vitest.config.ts.jinja
+    destination: vitest.config.ts
+    strategy: create
+  - source: templates/test/unit/todo-service.test.ts.jinja
+    destination: test/unit/todo-service.test.ts
+    strategy: create
+    when: "architecture == clean && database == sqlite"
+  - source: templates/test/integration/health.test.ts.jinja
+    destination: test/integration/health.test.ts
+    strategy: create
+validation_commands:
+  - [npm, run, test]
+  - [npm, run, test:unit]
+  - [npm, run, test:integration]
+post_generation_instructions: []

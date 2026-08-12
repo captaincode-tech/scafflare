@@ -1,0 +1,9 @@
+import type { CreateTodoInput, Todo, UpdateTodoInput } from "./domain.js";
+
+export interface TodoRepository {
+  create(input: CreateTodoInput): Promise<Todo>;
+  list(): Promise<Todo[]>;
+  findById(id: number): Promise<Todo | null>;
+  update(id: number, input: UpdateTodoInput): Promise<Todo | null>;
+  delete(id: number): Promise<boolean>;
+}

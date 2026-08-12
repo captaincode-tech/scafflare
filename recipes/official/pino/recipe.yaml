@@ -1,0 +1,20 @@
+schema_version: 1
+metadata:
+  name: pino
+  version: 0.1.0
+  description: Structured Pino logging with environment-aware transport
+depends_on:
+  - typescript
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/src/logger.ts.jinja
+    destination: src/logger.ts
+    strategy: create
+validation_commands:
+  - [npm, run, typecheck]
+post_generation_instructions: []

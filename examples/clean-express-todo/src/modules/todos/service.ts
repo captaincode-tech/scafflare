@@ -1,0 +1,37 @@
+import { AppError, type CreateTodoInput, type Todo, type UpdateTodoInput } from "./domain.js";
+import type { TodoRepository } from "./repository.js";
+
+export class TodoService {
+  public constructor(private readonly repository: TodoRepository) {}
+
+  public create(input: CreateTodoInput): Promise<Todo> {
+    return this.repository.create(input);
+  }
+
+  public list(): Promise<Todo[]> {
+    return this.repository.list();
+  }
+
+  public async findById(id: number): Promise<Todo> {
+    const todo = await this.repository.findById(id);
+    if (todo === null) {
+      throw new AppError("NOT_FOUND", `Todo ${id} was not found`);
+    }
+    return todo;
+  }
+
+  public async update(id: number, input: UpdateTodoInput): Promise<Todo> {
+    const todo = await this.repository.update(id, input);
+    if (todo === null) {
+      throw new AppError("NOT_FOUND", `Todo ${id} was not found`);
+    }
+    return todo;
+  }
+
+  public async delete(id: number): Promise<void> {
+    const deleted = await this.repository.delete(id);
+    if (!deleted) {
+      throw new AppError("NOT_FOUND", `Todo ${id} was not found`);
+    }
+  }
+}

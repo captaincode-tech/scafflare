@@ -1,0 +1,31 @@
+schema_version: 1
+metadata:
+  name: drizzle
+  version: 0.1.0
+  description: Drizzle ORM schema and repository implementation
+depends_on:
+  - sqlite-libsql
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/drizzle.config.ts.jinja
+    destination: drizzle.config.ts
+    strategy: create
+  - source: templates/src/database/schema.ts.jinja
+    destination: src/database/schema.ts
+    strategy: create
+  - source: templates/src/database/client.ts.jinja
+    destination: src/database/client.ts
+    strategy: create
+  - source: templates/src/database/drizzle-todo-repository.ts.jinja
+    destination: src/database/drizzle-todo-repository.ts
+    strategy: create
+    when: "architecture == clean && database == sqlite"
+validation_commands:
+  - [npm, run, typecheck]
+post_generation_instructions:
+  - Run npm run db:push to create the SQLite schema.

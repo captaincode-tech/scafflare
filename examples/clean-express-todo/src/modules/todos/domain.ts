@@ -1,0 +1,30 @@
+export type Todo = {
+  id: number;
+  title: string;
+  completed: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type CreateTodoInput = {
+  title: string;
+};
+
+export type UpdateTodoInput = {
+  title?: string | undefined;
+  completed?: boolean | undefined;
+};
+
+export class AppError extends Error {
+  public constructor(
+    public readonly code: "VALIDATION_ERROR" | "NOT_FOUND" | "INTERNAL_ERROR",
+    message: string,
+  ) {
+    super(message);
+    this.name = "AppError";
+  }
+
+  public get statusCode(): number {
+    return this.code === "VALIDATION_ERROR" ? 400 : this.code === "NOT_FOUND" ? 404 : 500;
+  }
+}

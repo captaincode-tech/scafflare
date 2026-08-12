@@ -1,0 +1,13 @@
+import { createServer } from "node:http";
+
+import { env } from "./config/env.js";
+
+const server = createServer((request, response) => {
+  const body = request.url === "/health" ? { status: "ok" } : { error: "Not found" };
+  response.writeHead(request.url === "/health" ? 200 : 404, { "content-type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(body));
+});
+
+server.listen(env.PORT, () => console.info(`Server listening on http://localhost:${env.PORT}`));
+process.once("SIGINT", () => server.close());
+process.once("SIGTERM", () => server.close());

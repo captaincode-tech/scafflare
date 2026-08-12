@@ -1,0 +1,21 @@
+# golden-api
+
+Backend TypeScript تولیدشده با StackForge، با معماری **Minimal**.
+
+## شروع سریع
+
+```bash
+npm install
+npm run dev
+```
+
+سرویس روی `http://localhost:3000` اجرا می‌شود و endpoint سلامت در `GET /health` در دسترس است.
+
+## دستورات
+
+| دستور | کاربرد |
+|---|---|
+| `npm run dev` | اجرای توسعه با watch |
+| `npm run typecheck` | بررسی strict TypeScript |
+| `npm run build` | تولید خروجی ESM در `dist/` |
+| `npm start` | اجرای build تولیدشده |

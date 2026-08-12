@@ -1,0 +1,31 @@
+import { createServer } from "node:http";
+
+import { env } from "./config/env.js";
+
+const server = createServer((request, response) => {
+  if (request.url === "/health") {
+    response.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ status: "ok" }));
+    return;
+  }
+
+  response.writeHead(404, { "content-type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify({ error: "Not found" }));
+});
+
+server.listen(env.PORT, () => {
+  console.info(`Server listening on http://localhost:${env.PORT}`);
+});
+
+function shutdown(signal: string): void {
+  console.info(`Received ${signal}; shutting down`);
+  server.close((error) => {
+    if (error) {
+      console.error(error);
+      process.exitCode = 1;
+    }
+  });
+}
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));

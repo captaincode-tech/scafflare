@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest";
+
+{% if framework == "express" %}
+import request from "supertest";
+import { app } from "../../src/server.js";
+
+describe("GET /health", () => {
+  it("returns an OK health response", async () => {
+    const response = await request(app).get("/health");
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: "ok" });
+  });
+});
+{% elif framework == "hono" %}
+import { app } from "../../src/server.js";
+
+describe("GET /health", () => {
+  it("returns an OK health response", async () => {
+    const response = await app.request("/health");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: "ok" });
+  });
+});
+{% else %}
+import { env } from "../../src/config/env.js";
+
+describe("runtime configuration", () => {
+  it("provides a valid default port", () => {
+    expect(env.PORT).toBe(3000);
+  });
+});
+{% endif %}

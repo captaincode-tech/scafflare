@@ -1,0 +1,23 @@
+schema_version: 1
+metadata:
+  name: architecture-layered
+  version: 0.1.0
+  description: Layered backend structure with controller and service boundaries
+depends_on:
+  - typescript
+compatible_with: []
+conflicts:
+  - architecture-minimal
+  - architecture-clean
+required_capabilities: []
+files:
+  - source: templates/src/server.ts.jinja
+    destination: src/server.ts
+    strategy: create
+    when: "framework == none"
+  - source: templates/README.md.jinja
+    destination: README.md
+    strategy: create
+validation_commands:
+  - [npm, run, build]
+post_generation_instructions: []

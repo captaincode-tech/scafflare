@@ -1,0 +1,46 @@
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+
+import { env } from "./config/env.js";
+{% if architecture == "clean" and database == "sqlite" %}
+import { DrizzleTodoRepository } from "./database/drizzle-todo-repository.js";
+import { db } from "./database/client.js";
+import { TodoController } from "./modules/todos/controller.js";
+import { createTodoRoutes } from "./modules/todos/routes-hono.js";
+import { TodoService } from "./modules/todos/service.js";
+{% endif %}
+{% if pino_enabled %}
+import { logger } from "./logger.js";
+{% endif %}
+
+export const app = new Hono();
+app.get("/health", (context) => context.json({ status: "ok" }));
+
+{% if architecture == "clean" and database == "sqlite" %}
+const todoRepository = new DrizzleTodoRepository(db);
+const todoController = new TodoController(new TodoService(todoRepository));
+app.route("/", createTodoRoutes(todoController));
+{% else %}
+app.notFound((context) => context.json({ error: "Not found" }, 404));
+{% endif %}
+
+let server: ReturnType<typeof serve> | undefined;
+
+if (env.NODE_ENV !== "test") {
+  server = serve({ fetch: app.fetch, port: env.PORT }, () => {
+    {% if pino_enabled %}logger.info({ port: env.PORT }, "Server listening");{% else %}console.info(`Server listening on http://localhost:${env.PORT}`);{% endif %}
+  });
+}
+
+function shutdown(signal: string): void {
+  {% if pino_enabled %}logger.info({ signal }, "Shutting down");{% else %}console.info(`Received ${signal}; shutting down`);{% endif %}
+  server?.close((error) => {
+    if (error) {
+      {% if pino_enabled %}logger.error({ error }, "Shutdown failed");{% else %}console.error(error);{% endif %}
+      process.exitCode = 1;
+    }
+  });
+}
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));

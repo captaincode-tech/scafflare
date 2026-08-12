@@ -1,0 +1,21 @@
+schema_version: 1
+metadata:
+  name: husky-lint-staged
+  version: 0.1.0
+  description: Git hooks using Husky and lint-staged
+depends_on:
+  - biome
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/.husky/pre-commit.jinja
+    destination: .husky/pre-commit
+    strategy: create
+validation_commands:
+  - [npm, run, lint]
+post_generation_instructions:
+  - Run npm install to activate Husky hooks.

@@ -1,0 +1,21 @@
+schema_version: 1
+metadata:
+  name: express
+  version: 0.1.0
+  description: Express HTTP adapter with secure defaults and graceful shutdown
+depends_on:
+  - typescript
+compatible_with: []
+conflicts:
+  - hono
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/src/server.ts.jinja
+    destination: src/server.ts
+    strategy: create
+validation_commands:
+  - [npm, run, build]
+post_generation_instructions: []

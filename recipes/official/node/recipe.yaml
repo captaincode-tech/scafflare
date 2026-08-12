@@ -1,0 +1,21 @@
+schema_version: 1
+metadata:
+  name: node
+  version: 0.1.0
+  description: Node.js runtime baseline with secure package metadata
+depends_on: []
+compatible_with: []
+conflicts: []
+required_capabilities:
+  - node-runtime
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/.gitignore.jinja
+    destination: .gitignore
+    strategy: create
+validation_commands:
+  - [npm, run, typecheck]
+post_generation_instructions:
+  - Install dependencies with npm install.

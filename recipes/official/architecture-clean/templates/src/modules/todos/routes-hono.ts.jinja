@@ -1,0 +1,50 @@
+import { Hono } from "hono";
+import { z } from "zod";
+
+import { AppError, type CreateTodoInput, type UpdateTodoInput } from "./domain.js";
+import type { TodoController } from "./controller.js";
+
+const idSchema = z.coerce.number().int().positive();
+const createSchema = z.object({ title: z.string().trim().min(1).max(200) });
+const updateSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  completed: z.boolean().optional(),
+}).refine((value) => value.title !== undefined || value.completed !== undefined, "At least one field is required");
+
+export function createTodoRoutes(controller: TodoController): Hono {
+  const router = new Hono();
+
+  router.post("/todos", async (context) => {
+    const input: CreateTodoInput = createSchema.parse(await context.req.json());
+    return context.json(await controller.create(input), 201);
+  });
+
+  router.get("/todos", async (context) => context.json(await controller.list()));
+
+  router.get("/todos/:id", async (context) =>
+    context.json(await controller.findById(idSchema.parse(context.req.param("id")))),
+  );
+
+  router.patch("/todos/:id", async (context) => {
+    const input: UpdateTodoInput = updateSchema.parse(await context.req.json());
+    return context.json(await controller.update(idSchema.parse(context.req.param("id")), input));
+  });
+
+  router.delete("/todos/:id", async (context) => {
+    await controller.delete(idSchema.parse(context.req.param("id")));
+    return context.body(null, 204);
+  });
+
+  router.onError((error, context) => {
+    if (error instanceof z.ZodError) {
+      return context.json({ error: "Validation failed", details: error.flatten() }, 400);
+    }
+    if (error instanceof AppError) {
+      return context.json({ error: error.message, code: error.code }, error.statusCode);
+    }
+    console.error(error);
+    return context.json({ error: "Internal server error" }, 500);
+  });
+
+  return router;
+}

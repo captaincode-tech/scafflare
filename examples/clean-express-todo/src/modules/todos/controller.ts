@@ -1,0 +1,26 @@
+import type { CreateTodoInput, UpdateTodoInput } from "./domain.js";
+import type { TodoService } from "./service.js";
+
+export class TodoController {
+  public constructor(private readonly service: TodoService) {}
+
+  public create(input: CreateTodoInput) {
+    return this.service.create(input);
+  }
+
+  public list() {
+    return this.service.list();
+  }
+
+  public findById(id: number) {
+    return this.service.findById(id);
+  }
+
+  public update(id: number, input: UpdateTodoInput) {
+    return this.service.update(id, input);
+  }
+
+  public delete(id: number) {
+    return this.service.delete(id);
+  }
+}

@@ -1,0 +1,26 @@
+schema_version: 1
+metadata:
+  name: typescript
+  version: 0.1.0
+  description: Strict TypeScript and native ESM configuration
+depends_on:
+  - node
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/tsconfig.json.jinja
+    destination: tsconfig.json
+    strategy: create
+  - source: templates/tsconfig.build.json.jinja
+    destination: tsconfig.build.json
+    strategy: create
+  - source: templates/src/config/env.ts.jinja
+    destination: src/config/env.ts
+    strategy: create
+  - source: templates/.env.example.jinja
+    destination: .env.example
+    strategy: create
+validation_commands:
+  - [npm, run, typecheck]
+post_generation_instructions: []

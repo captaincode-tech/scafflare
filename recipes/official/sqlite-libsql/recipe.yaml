@@ -1,0 +1,17 @@
+schema_version: 1
+metadata:
+  name: sqlite-libsql
+  version: 0.1.0
+  description: SQLite and LibSQL database client baseline
+depends_on:
+  - typescript
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+validation_commands:
+  - [npm, run, typecheck]
+post_generation_instructions: []

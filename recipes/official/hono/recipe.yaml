@@ -1,0 +1,21 @@
+schema_version: 1
+metadata:
+  name: hono
+  version: 0.1.0
+  description: Hono HTTP adapter with Node.js server and graceful shutdown
+depends_on:
+  - typescript
+compatible_with: []
+conflicts:
+  - express
+required_capabilities: []
+files:
+  - source: templates/package.fragment.json.jinja
+    destination: package.json
+    strategy: merge_json
+  - source: templates/src/server.ts.jinja
+    destination: src/server.ts
+    strategy: create
+validation_commands:
+  - [npm, run, build]
+post_generation_instructions: []

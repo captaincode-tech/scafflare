@@ -1,0 +1,16 @@
+schema_version: 1
+metadata:
+  name: github-actions
+  version: 0.1.0
+  description: GitHub Actions CI for install, typecheck, lint, test and build
+depends_on:
+  - typescript
+compatible_with: []
+conflicts: []
+required_capabilities: []
+files:
+  - source: templates/.github/workflows/ci.yml.jinja
+    destination: .github/workflows/ci.yml
+    strategy: create
+validation_commands: []
+post_generation_instructions: []

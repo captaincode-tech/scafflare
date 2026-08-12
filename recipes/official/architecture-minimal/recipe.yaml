@@ -1,0 +1,24 @@
+schema_version: 1
+metadata:
+  name: architecture-minimal
+  version: 0.1.0
+  description: Minimal backend layout with a health endpoint
+depends_on:
+  - typescript
+compatible_with: []
+conflicts:
+  - architecture-layered
+  - architecture-clean
+required_capabilities: []
+files:
+  - source: templates/src/server.ts.jinja
+    destination: src/server.ts
+    strategy: create
+    when: "framework == none"
+  - source: templates/README.md.jinja
+    destination: README.md
+    strategy: create
+validation_commands:
+  - [npm, run, build]
+post_generation_instructions:
+  - Run npm install and then npm run dev.
