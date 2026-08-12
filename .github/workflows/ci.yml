@@ -31,7 +31,7 @@ jobs:
       - name: Release build
         run: cargo build --workspace --release
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: scafflare-${{ runner.os }}
           path: target/release/scafflare*

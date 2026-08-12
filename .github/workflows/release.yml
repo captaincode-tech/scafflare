@@ -110,7 +110,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Path "target/release/${{ matrix.binary_name }}" -DestinationPath "dist/${{ matrix.archive_name }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.asset_name }}
           path: dist/${{ matrix.archive_name }}
