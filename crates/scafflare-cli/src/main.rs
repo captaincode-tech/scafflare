@@ -7,11 +7,11 @@ use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use serde::Serialize;
 use serde_json::Value;
-use stackforge_core::plan::{ChangeKind, FilePlan};
-use stackforge_core::recipe::RecipeDocument;
-use stackforge_core::registry::{BundledRegistry, RecipeRegistry};
-use stackforge_core::state::load_state;
-use stackforge_core::{
+use scafflare_core::plan::{ChangeKind, FilePlan};
+use scafflare_core::recipe::RecipeDocument;
+use scafflare_core::registry::{BundledRegistry, RecipeRegistry};
+use scafflare_core::state::load_state;
+use scafflare_core::{
     commit, preview_add, preview_init, preview_remove, run_safe_validation_commands,
     validation_commands, GenerationPreview, GenerationRequest,
 };
@@ -19,7 +19,7 @@ use stackforge_core::{
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Parser)]
-#[command(name = "stackforge", version = VERSION, about = "Composable, language-agnostic backend scaffolding")]
+#[command(name = "scafflare", version = VERSION, about = "Composable, language-agnostic backend scaffolding")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -37,13 +37,13 @@ struct Cli {
 enum Commands {
     /// Create a project from composable recipes.
     Init(InitArgs),
-    /// Add one or more recipes to an existing StackForge project.
+    /// Add one or more recipes to an existing Scafflare project.
     Add(ModifyArgs),
     /// Remove a recipe and its unmodified, exclusively owned files.
     Remove(RemoveArgs),
     /// List bundled recipes.
     List,
-    /// Diagnose StackForge and the project state.
+    /// Diagnose Scafflare and the project state.
     Doctor(PathArgs),
     /// Validate the current project's lockfile and installed recipes.
     Validate(PathArgs),
@@ -273,7 +273,7 @@ fn doctor(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
     let npm = command_available("npm");
     let state = load_state(&args.directory).ok();
     let report = serde_json::json!({
-        "stackforge_version": VERSION,
+        "scafflare_version": VERSION,
         "project": args.directory,
         "node": node,
         "npm": npm,
@@ -283,7 +283,7 @@ fn doctor(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
     if cli.json {
         emit_json(&report)?;
     } else {
-        println!("{} StackForge {}", style("doctor").cyan().bold(), VERSION);
+        println!("{} Scafflare {}", style("doctor").cyan().bold(), VERSION);
         println!("  node: {}", status(node));
         println!("  npm:  {}", status(npm));
         println!(

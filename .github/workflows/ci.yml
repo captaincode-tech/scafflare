@@ -33,8 +33,8 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: stackforge-${{ runner.os }}
-          path: target/release/stackforge*
+          name: scafflare-${{ runner.os }}
+          path: target/release/scafflare*
           if-no-files-found: error
 
   recipe-validation:
@@ -47,5 +47,5 @@ jobs:
         shell: bash
         run: |
           for recipe in recipes/official/*; do
-            cargo run -q -p stackforge -- recipe validate "$recipe/recipe.yaml" --quiet
+            cargo run -q -p scafflare -- recipe validate "$recipe/recipe.yaml" --quiet
           done

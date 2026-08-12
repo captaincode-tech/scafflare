@@ -15,7 +15,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
-use error::{Result, StackForgeError};
+use error::{Result, ScafflareError};
 use plan::{ChangeKind, FilePlan, PlannedChange};
 use recipe::LoadedRecipe;
 use registry::RecipeRegistry;
@@ -48,21 +48,21 @@ pub fn preview_init<R: RecipeRegistry>(
     request: GenerationRequest,
 ) -> Result<GenerationPreview> {
     if !is_valid_project_name(&request.project_name) {
-        return Err(StackForgeError::InvalidInput(
+        return Err(ScafflareError::InvalidInput(
             "project name must use lowercase letters, digits, hyphens or underscores".to_owned(),
         ));
     }
     if root.exists()
         && root
             .read_dir()
-            .map_err(|error| StackForgeError::io(root, error))?
+            .map_err(|error| ScafflareError::io(root, error))?
             .next()
             .is_some()
     {
-        return Err(StackForgeError::FileConflict {
+        return Err(ScafflareError::FileConflict {
             path: root.to_path_buf(),
             reason:
-                "init target must be empty; use `stackforge add` for an existing StackForge project"
+                "init target must be empty; use `scafflare add` for an existing Scafflare project"
                     .to_owned(),
         });
     }
@@ -129,7 +129,7 @@ pub fn preview_remove<R: RecipeRegistry>(
 ) -> Result<(FilePlan, ProjectState)> {
     let current_state = load_state(root)?;
     if !current_state.has_recipe(recipe) {
-        return Err(StackForgeError::InvalidInput(format!(
+        return Err(ScafflareError::InvalidInput(format!(
             "recipe `{recipe}` is not installed"
         )));
     }
@@ -173,9 +173,9 @@ pub fn preview_remove<R: RecipeRegistry>(
         if !still_rendered && managed.recipes.len() == 1 && managed.recipes[0] == recipe {
             let path = root.join(relative);
             if path.exists() {
-                let current = fs::read(&path).map_err(|error| StackForgeError::io(&path, error))?;
+                let current = fs::read(&path).map_err(|error| ScafflareError::io(&path, error))?;
                 if sha256_hex(&current) != managed.sha256 {
-                    return Err(StackForgeError::FileConflict {
+                    return Err(ScafflareError::FileConflict {
                         path: relative.into(),
                         reason: "refusing to delete a user-modified managed file".to_owned(),
                     });
@@ -229,7 +229,7 @@ pub fn run_safe_validation_commands(
     for recipe in &resolution.recipes {
         for command in &recipe.document.validation_commands {
             let Some((program, args)) = command.program_and_args() else {
-                return Err(StackForgeError::InvalidRecipe {
+                return Err(ScafflareError::InvalidRecipe {
                     recipe: recipe.document.metadata.name.clone(),
                     reason: "validation command must use argv YAML form to be executable"
                         .to_owned(),
@@ -239,7 +239,7 @@ pub fn run_safe_validation_commands(
                 .args(args)
                 .current_dir(root)
                 .status()
-                .map_err(|error| StackForgeError::Transaction {
+                .map_err(|error| ScafflareError::Transaction {
                     path: root.to_path_buf(),
                     reason: format!("cannot start `{program}`: {error}"),
                 })?;
@@ -248,7 +248,7 @@ pub fn run_safe_validation_commands(
                 status.success(),
             ));
             if !status.success() {
-                return Err(StackForgeError::Transaction {
+                return Err(ScafflareError::Transaction {
                     path: root.to_path_buf(),
                     reason: format!("validation command `{}` failed", command.display()),
                 });
@@ -265,7 +265,7 @@ fn update_managed_files(
 ) {
     for change in &plan.changes {
         if matches!(change.kind, ChangeKind::Create | ChangeKind::Update)
-            && change.path != Path::new(".stackforge/lock.yaml")
+            && change.path != Path::new(".scafflare/lock.yaml")
         {
             if let Some(contents) = &change.contents {
                 let mut owners: Vec<String> = rendered
@@ -299,12 +299,12 @@ fn append_lockfile_change(root: &Path, plan: &mut FilePlan, state: &ProjectState
         Ok(existing) if existing == contents => ChangeKind::Unchanged,
         Ok(_) => ChangeKind::Update,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => ChangeKind::Create,
-        Err(error) => return Err(StackForgeError::io(&path, error)),
+        Err(error) => return Err(ScafflareError::io(&path, error)),
     };
     plan.changes.push(PlannedChange {
         kind,
-        path: Path::new(".stackforge").join("lock.yaml"),
-        recipe: "stackforge-state".to_owned(),
+        path: Path::new(".scafflare").join("lock.yaml"),
+        recipe: "scafflare-state".to_owned(),
         contents: if kind == ChangeKind::Unchanged {
             None
         } else {
@@ -393,7 +393,7 @@ mod integration_tests {
         let expected = include_str!("../../../fixtures/golden/minimal-package.json");
         let actual = fs::read_to_string(root.join("package.json")).unwrap();
         assert_eq!(actual, expected);
-        assert!(root.join(".stackforge/lock.yaml").is_file());
+        assert!(root.join(".scafflare/lock.yaml").is_file());
 
         let second = preview_add(
             &root,
@@ -410,7 +410,7 @@ mod integration_tests {
         let registry = BundledRegistry::new();
         let result = Resolver::new(&registry, BTreeSet::from(["node-runtime".to_owned()]))
             .resolve(&["express".to_owned(), "hono".to_owned()]);
-        assert!(matches!(result, Err(StackForgeError::Conflict { .. })));
+        assert!(matches!(result, Err(ScafflareError::Conflict { .. })));
     }
 
     #[test]
@@ -427,7 +427,7 @@ mod integration_tests {
             "architecture-minimal",
             BTreeSet::from(["node-runtime".to_owned(), "npm".to_owned()]),
         );
-        assert!(matches!(result, Err(StackForgeError::FileConflict { .. })));
+        assert!(matches!(result, Err(ScafflareError::FileConflict { .. })));
     }
 
     #[test]

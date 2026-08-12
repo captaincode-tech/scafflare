@@ -1,12 +1,12 @@
 [package]
-name = "stackforge"
+name = "scafflare"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "stackforge"
+name = "scafflare"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,4 +17,4 @@ dialoguer.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-stackforge-core = { path = "../stackforge-core" }
+scafflare-core = { path = "../scafflare-core" }

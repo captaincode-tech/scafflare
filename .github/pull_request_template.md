@@ -7,7 +7,7 @@
 - [ ] `cargo fmt --all -- --check`
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings`
 - [ ] `cargo test --workspace`
-- [ ] در صورت تغییر Recipe، `stackforge recipe validate` اجرا شده است.
+- [ ] در صورت تغییر Recipe، `scafflare recipe validate` اجرا شده است.
 - [ ] در صورت تغییر template Node.js، fixture مرتبط install، typecheck، lint، test و build شده است.
 
 ## امنیت و سازگاری

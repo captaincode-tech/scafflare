@@ -1,5 +1,5 @@
 /target
-/.stackforge
+/.scafflare
 .DS_Store
 *.log
 examples/**/node_modules

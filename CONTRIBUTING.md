@@ -1,4 +1,4 @@
-# مشارکت در StackForge
+# مشارکت در Scafflare
 
 از مشارکت شما استقبال می‌کنیم. لطفاً پیش از ایجاد Pull Request، یک issue برای تغییرهای بزرگ باز کنید تا scope و قرارداد Recipe به توافق برسد.
 
@@ -6,13 +6,13 @@
 
 ```bash
 git clone <your-fork-url>
-cd stackforge
+cd scafflare
 cargo test --workspace
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-هر تغییر Rust باید تست مرتبط داشته باشد. هر تغییر در Recipe باید با `stackforge recipe validate` و حداقل یک generation غیرتعاملی تست شود. برای تغییر template Node.js، `npm install`، `npm run typecheck`، `npm run lint`، `npm test` و `npm run build` را برای fixture مرتبط اجرا کنید.
+هر تغییر Rust باید تست مرتبط داشته باشد. هر تغییر در Recipe باید با `scafflare recipe validate` و حداقل یک generation غیرتعاملی تست شود. برای تغییر template Node.js، `npm install`، `npm run typecheck`، `npm run lint`، `npm test` و `npm run build` را برای fixture مرتبط اجرا کنید.
 
 ## اصول طراحی
 

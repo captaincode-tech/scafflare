@@ -1,28 +1,28 @@
-# StackForge
+# Scafflare
 
-**StackForge** یک CLI سریع و standalone در Rust برای ساخت backendهای Node.js/TypeScript با Recipeهای YAML ترکیب‌پذیر است. هسته نسبت به زبان و framework بی‌طرف است: Express، Hono، Drizzle و ابزارهای کیفیت صرفاً Recipe هستند، نه وابستگی‌های hard-coded هسته.
+**Scafflare** یک CLI سریع و standalone در Rust برای ساخت backendهای Node.js/TypeScript با Recipeهای YAML ترکیب‌پذیر است. هسته نسبت به زبان و framework بی‌طرف است: Express، Hono، Drizzle و ابزارهای کیفیت صرفاً Recipe هستند، نه وابستگی‌های hard-coded هسته.
 
-> امنیت پیش‌فرض: Recipeها داده هستند. StackForge هیچ command خارجی را خودکار اجرا نمی‌کند؛ اجرای validation commandهای اعلام‌شده فقط با `--run-commands` ممکن است.
+> امنیت پیش‌فرض: Recipeها داده هستند. Scafflare هیچ command خارجی را خودکار اجرا نمی‌کند؛ اجرای validation commandهای اعلام‌شده فقط با `--run-commands` ممکن است.
 
 ## نصب
 
 برای ساخت از source به Rust Stable نیاز دارید:
 
 ```bash
-git clone https://github.com/stackforge/stackforge.git
-cd stackforge
+git clone https://github.com/scafflare/scafflare.git
+cd scafflare
 cargo build --release
-./target/release/stackforge --help
+./target/release/scafflare --help
 ```
 
-Binary تولیدشده در `target/release/stackforge` روی Linux، macOS و Windows قابل انتشار است. در Windows نام فایل `stackforge.exe` خواهد بود.
+Binary تولیدشده در `target/release/scafflare` روی Linux، macOS و Windows قابل انتشار است. در Windows نام فایل `scafflare.exe` خواهد بود.
 
 ## شروع سریع
 
 نمونهٔ کامل Express + Clean Architecture + SQLite/LibSQL + Drizzle را ایجاد کنید:
 
 ```bash
-stackforge init todo-api \
+scafflare init todo-api \
   --non-interactive \
   --framework express \
   --architecture clean \
@@ -40,21 +40,21 @@ npm run build
 npm run dev
 ```
 
-برای wizard تعاملی، فقط `stackforge init todo-api` را اجرا کنید. قبل از هر تغییر، preview فایل‌ها نمایش داده می‌شود. برای automation باید `--yes` را صریحاً وارد کنید.
+برای wizard تعاملی، فقط `scafflare init todo-api` را اجرا کنید. قبل از هر تغییر، preview فایل‌ها نمایش داده می‌شود. برای automation باید `--yes` را صریحاً وارد کنید.
 
-![StackForge init → build → health-check demo](docs/assets/stackforge-demo.gif)
+![Scafflare init → build → health-check demo](docs/assets/scafflare-demo.gif)
 
 ## دستورات
 
 | دستور | کاربرد |
 |---|---|
-| `stackforge init <project-name>` | ایجاد پروژه با wizard یا flagهای non-interactive |
-| `stackforge add <recipe...>` | افزودن Recipe به پروژهٔ مدیریت‌شده |
-| `stackforge remove <recipe>` | حذف ایمن Recipe و فایل‌های exclusively-owned و بدون تغییر کاربر |
-| `stackforge list` | نمایش Recipeهای bundle شده |
-| `stackforge doctor` | بررسی Node/npm و lockfile پروژه |
-| `stackforge validate` | بررسی lockfile و نسخهٔ Recipeهای نصب‌شده |
-| `stackforge recipe validate <path>` | اعتبارسنجی recipe.yaml و templateهای مرجع |
+| `scafflare init <project-name>` | ایجاد پروژه با wizard یا flagهای non-interactive |
+| `scafflare add <recipe...>` | افزودن Recipe به پروژهٔ مدیریت‌شده |
+| `scafflare remove <recipe>` | حذف ایمن Recipe و فایل‌های exclusively-owned و بدون تغییر کاربر |
+| `scafflare list` | نمایش Recipeهای bundle شده |
+| `scafflare doctor` | بررسی Node/npm و lockfile پروژه |
+| `scafflare validate` | بررسی lockfile و نسخهٔ Recipeهای نصب‌شده |
+| `scafflare recipe validate <path>` | اعتبارسنجی recipe.yaml و templateهای مرجع |
 
 گزینه‌های global `--json` و `--quiet` برای CI و automation موجود هستند. خروجی `--json` فقط به stdout نوشته می‌شود. `--run-commands` commandهای validation در فرم آرایه‌ای YAML را بعد از commit اجرا می‌کند؛ commandهای shell-like هرگز اجرا نمی‌شوند.
 
@@ -108,7 +108,7 @@ post_generation_instructions:
 برای آزمایش یک Recipe محلی:
 
 ```bash
-stackforge recipe validate recipes/custom/example/recipe.yaml
+scafflare recipe validate recipes/custom/example/recipe.yaml
 ```
 
 جزئیات چرخهٔ generation، lockfile و مدل امنیتی در [معماری](docs/architecture.md) آمده است.
@@ -130,4 +130,4 @@ Registry آنلاین، signature verification، pluginهای native، Laravel/P
 
 ## مجوز
 
-StackForge تحت [MIT License](LICENSE) منتشر می‌شود.
+Scafflare تحت [MIT License](LICENSE) منتشر می‌شود.

@@ -2,14 +2,14 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-OUTPUT = Path(__file__).resolve().parents[1] / "docs" / "assets" / "stackforge-demo.gif"
+OUTPUT = Path(__file__).resolve().parents[1] / "docs" / "assets" / "scafflare-demo.gif"
 WIDTH, HEIGHT = 1120, 630
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 
 FRAMES = [
     [
-        ("$ stackforge init todo-api --non-interactive \\", "command"),
+        ("$ scafflare init todo-api --non-interactive \\", "command"),
         ("    --framework express --architecture clean \\", "command"),
         ("    --database sqlite --vitest --biome --yes", "command"),
         ("", "plain"),
@@ -17,7 +17,7 @@ FRAMES = [
         ("  create   package.json                 (zod)", "success"),
         ("  create   src/server.ts                (express)", "success"),
         ("  create   src/modules/todos/service.ts (architecture-clean)", "success"),
-        ("  create   .stackforge/lock.yaml        (stackforge-state)", "success"),
+        ("  create   .scafflare/lock.yaml        (scafflare-state)", "success"),
         ("done generated ./todo-api", "success"),
     ],
     [
@@ -36,8 +36,8 @@ FRAMES = [
         ("", "plain"),
         ("$ curl -X POST http://localhost:3000/todos \\", "command"),
         ("    -H 'content-type: application/json' \\", "command"),
-        ("    -d '{\"title\":\"Ship StackForge\"}'", "command"),
-        ('{"id":1,"title":"Ship StackForge","completed":false}', "success"),
+        ("    -d '{\"title\":\"Ship Scafflare\"}'", "command"),
+        ('{"id":1,"title":"Ship Scafflare","completed":false}', "success"),
         ("", "plain"),
         ("Fast, composable, production-minded backends.", "accent"),
     ],

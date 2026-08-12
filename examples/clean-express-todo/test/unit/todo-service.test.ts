@@ -35,8 +35,8 @@ class MemoryTodoRepository implements TodoRepository {
 describe("TodoService", () => {
   it("creates, reads, updates and deletes a Todo", async () => {
     const service = new TodoService(new MemoryTodoRepository());
-    const created = await service.create({ title: "Ship StackForge" });
-    expect(await service.findById(created.id)).toMatchObject({ title: "Ship StackForge", completed: false });
+    const created = await service.create({ title: "Ship Scafflare" });
+    expect(await service.findById(created.id)).toMatchObject({ title: "Ship Scafflare", completed: false });
     expect(await service.update(created.id, { completed: true })).toMatchObject({ completed: true });
     await service.delete(created.id);
     await expect(service.findById(created.id)).rejects.toMatchObject({ code: "NOT_FOUND" });

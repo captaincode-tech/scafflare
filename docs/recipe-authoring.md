@@ -17,7 +17,7 @@ Recipe یک واحد دادهٔ قابل ترکیب است که بدون تغی�
 
 ## مسیرها و امنیت
 
-تمام sourceها باید زیر `templates/` باشند. destination و source فقط می‌توانند مسیر relative با slash استاندارد داشته باشند. StackForge `..`، مسیر absolute، backslash و drive prefix ویندوز را رد می‌کند. این محدودیت مسیرهای Unix و Windows را هم‌زمان پوشش می‌دهد.
+تمام sourceها باید زیر `templates/` باشند. destination و source فقط می‌توانند مسیر relative با slash استاندارد داشته باشند. Scafflare `..`، مسیر absolute، backslash و drive prefix ویندوز را رد می‌کند. این محدودیت مسیرهای Unix و Windows را هم‌زمان پوشش می‌دهد.
 
 ## شرط‌ها
 
@@ -39,13 +39,13 @@ when: "framework == express && database == sqlite"
 | `skip` | عدم تغییر فایل و ثبت در preview |
 | `fail` | در صورت وجود مقصد خطای روشن می‌دهد |
 
-در صورت وجود چند fragment برای یک JSON، StackForge نتیجهٔ merge نهایی را فقط یک‌بار می‌نویسد. هیچ injection متنی در JSON انجام نمی‌شود.
+در صورت وجود چند fragment برای یک JSON، Scafflare نتیجهٔ merge نهایی را فقط یک‌بار می‌نویسد. هیچ injection متنی در JSON انجام نمی‌شود.
 
 ## تست
 
 ```bash
-stackforge recipe validate path/to/recipe.yaml
-stackforge init fixture --non-interactive --framework hono --architecture layered --database sqlite --yes
+scafflare recipe validate path/to/recipe.yaml
+scafflare init fixture --non-interactive --framework hono --architecture layered --database sqlite --yes
 ```
 
 Recipe جدید باید validation موفق، generation بدون conflict ناخواسته، اجرای مجدد idempotent و در صورت ساخت پروژهٔ Node.js، install/typecheck/lint/test/build معتبر داشته باشد.

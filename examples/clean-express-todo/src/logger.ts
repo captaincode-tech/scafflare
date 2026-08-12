@@ -9,6 +9,6 @@ const developmentTransport = env.NODE_ENV === "development"
 export const logger = pino({
   level: env.LOG_LEVEL,
   ...(developmentTransport === undefined ? {} : { transport: developmentTransport }),
-  base: { service: "stackforge-generated-clean" },
+  base: { service: "scafflare-generated-clean" },
   redact: ["req.headers.authorization", "password", "token"],
 });

@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sha2::{Digest, Sha256};
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 use crate::plan::{ChangeKind, FilePlan, PlannedChange};
 
 #[derive(Debug, Clone)]
@@ -28,15 +28,15 @@ pub fn apply_plan(root: &Path, plan: &FilePlan) -> Result<()> {
         return Ok(());
     }
 
-    fs::create_dir_all(root).map_err(|error| StackForgeError::io(root, error))?;
+    fs::create_dir_all(root).map_err(|error| ScafflareError::io(root, error))?;
     let transaction_root = root
-        .join(".stackforge")
+        .join(".scafflare")
         .join("transactions")
         .join(unique_id());
     let stage_root = transaction_root.join("stage");
     let backup_root = transaction_root.join("backup");
-    fs::create_dir_all(&stage_root).map_err(|error| StackForgeError::io(&stage_root, error))?;
-    fs::create_dir_all(&backup_root).map_err(|error| StackForgeError::io(&backup_root, error))?;
+    fs::create_dir_all(&stage_root).map_err(|error| ScafflareError::io(&stage_root, error))?;
+    fs::create_dir_all(&backup_root).map_err(|error| ScafflareError::io(&backup_root, error))?;
 
     for change in &changes {
         if matches!(change.kind, ChangeKind::Create | ChangeKind::Update) {
@@ -44,17 +44,17 @@ pub fn apply_plan(root: &Path, plan: &FilePlan) -> Result<()> {
             let parent = staged_path
                 .parent()
                 .expect("relative path must have a parent");
-            fs::create_dir_all(parent).map_err(|error| StackForgeError::io(parent, error))?;
+            fs::create_dir_all(parent).map_err(|error| ScafflareError::io(parent, error))?;
             let contents =
                 change
                     .contents
                     .as_ref()
-                    .ok_or_else(|| StackForgeError::Transaction {
+                    .ok_or_else(|| ScafflareError::Transaction {
                         path: change.path.clone(),
                         reason: "planned write is missing staged contents".to_owned(),
                     })?;
             fs::write(&staged_path, contents)
-                .map_err(|error| StackForgeError::io(&staged_path, error))?;
+                .map_err(|error| ScafflareError::io(&staged_path, error))?;
         }
     }
 
@@ -65,7 +65,7 @@ pub fn apply_plan(root: &Path, plan: &FilePlan) -> Result<()> {
             let _ = fs::remove_dir_all(&transaction_root);
             return match rollback_result {
                 Ok(()) => Err(error),
-                Err(rollback_error) => Err(StackForgeError::Transaction {
+                Err(rollback_error) => Err(ScafflareError::Transaction {
                     path: root.to_path_buf(),
                     reason: format!("{error}; rollback also failed: {rollback_error}"),
                 }),
@@ -73,7 +73,7 @@ pub fn apply_plan(root: &Path, plan: &FilePlan) -> Result<()> {
         }
     }
     fs::remove_dir_all(&transaction_root)
-        .map_err(|error| StackForgeError::io(&transaction_root, error))?;
+        .map_err(|error| ScafflareError::io(&transaction_root, error))?;
     prune_empty_transaction_parent(root);
     Ok(())
 }
@@ -89,8 +89,8 @@ fn apply_change(
     let backup = if target.exists() {
         let backup = backup_root.join(&change.path);
         let parent = backup.parent().expect("relative path must have a parent");
-        fs::create_dir_all(parent).map_err(|error| StackForgeError::io(parent, error))?;
-        fs::copy(&target, &backup).map_err(|error| StackForgeError::io(&target, error))?;
+        fs::create_dir_all(parent).map_err(|error| ScafflareError::io(parent, error))?;
+        fs::copy(&target, &backup).map_err(|error| ScafflareError::io(&target, error))?;
         Some(backup)
     } else {
         None
@@ -100,18 +100,18 @@ fn apply_change(
         ChangeKind::Create | ChangeKind::Update => {
             let staged = stage_root.join(&change.path);
             let parent = target.parent().expect("relative path must have a parent");
-            fs::create_dir_all(parent).map_err(|error| StackForgeError::io(parent, error))?;
+            fs::create_dir_all(parent).map_err(|error| ScafflareError::io(parent, error))?;
             if target.exists() {
-                fs::remove_file(&target).map_err(|error| StackForgeError::io(&target, error))?;
+                fs::remove_file(&target).map_err(|error| ScafflareError::io(&target, error))?;
             }
-            fs::rename(&staged, &target).map_err(|error| StackForgeError::Transaction {
+            fs::rename(&staged, &target).map_err(|error| ScafflareError::Transaction {
                 path: target.clone(),
                 reason: error.to_string(),
             })?;
         }
         ChangeKind::Delete => {
             if target.exists() {
-                fs::remove_file(&target).map_err(|error| StackForgeError::io(&target, error))?;
+                fs::remove_file(&target).map_err(|error| ScafflareError::io(&target, error))?;
             }
         }
         ChangeKind::Unchanged | ChangeKind::Skip => return Ok(()),
@@ -127,12 +127,12 @@ fn rollback(root: &Path, applied: &[AppliedChange]) -> Result<()> {
     for change in applied.iter().rev() {
         let target = root.join(&change.path);
         if target.exists() {
-            fs::remove_file(&target).map_err(|error| StackForgeError::io(&target, error))?;
+            fs::remove_file(&target).map_err(|error| ScafflareError::io(&target, error))?;
         }
         if let Some(backup) = &change.backup {
             let parent = target.parent().expect("relative path must have a parent");
-            fs::create_dir_all(parent).map_err(|error| StackForgeError::io(parent, error))?;
-            fs::copy(backup, &target).map_err(|error| StackForgeError::io(&target, error))?;
+            fs::create_dir_all(parent).map_err(|error| ScafflareError::io(parent, error))?;
+            fs::copy(backup, &target).map_err(|error| ScafflareError::io(&target, error))?;
         }
     }
     Ok(())
@@ -153,7 +153,7 @@ fn unique_id() -> String {
 }
 
 fn prune_empty_transaction_parent(root: &Path) {
-    let transactions = root.join(".stackforge").join("transactions");
+    let transactions = root.join(".scafflare").join("transactions");
     if transactions
         .read_dir()
         .map(|mut entries| entries.next().is_none())

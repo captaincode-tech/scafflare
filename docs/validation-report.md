@@ -24,7 +24,7 @@
 | Express بدون Database | موفق | موفق | موفق | موفق | موفق |
 | Non-interactive generation | موفق | موفق | موفق | موفق | موفق |
 
-Recipeهای رسمی نیز به‌صورت مستقل با `stackforge recipe validate` بررسی شدند.
+Recipeهای رسمی نیز به‌صورت مستقل با `scafflare recipe validate` بررسی شدند.
 
 ## آزمون عملی server و CRUD
 

@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 use crate::recipe::LoadedRecipe;
 use crate::registry::RecipeRegistry;
 
@@ -34,7 +34,7 @@ impl<'a, R: RecipeRegistry> Resolver<'a, R> {
 
     pub fn resolve(&self, requested: &[String]) -> Result<Resolution> {
         if requested.is_empty() {
-            return Err(StackForgeError::InvalidInput(
+            return Err(ScafflareError::InvalidInput(
                 "at least one recipe must be selected".to_owned(),
             ));
         }
@@ -60,7 +60,7 @@ impl<'a, R: RecipeRegistry> Resolver<'a, R> {
                 .expect("resolver must load every selected recipe");
             for conflict in &recipe.document.conflicts {
                 if selected.contains(conflict) {
-                    return Err(StackForgeError::Conflict {
+                    return Err(ScafflareError::Conflict {
                         left: name.clone(),
                         right: conflict.clone(),
                     });
@@ -73,14 +73,14 @@ impl<'a, R: RecipeRegistry> Resolver<'a, R> {
                     .iter()
                     .any(|candidate| selected.contains(candidate))
             {
-                return Err(StackForgeError::Incompatible {
+                return Err(ScafflareError::Incompatible {
                     recipe: name.clone(),
                     selected: recipe.document.compatible_with.join(", "),
                 });
             }
             for capability in &recipe.document.required_capabilities {
                 if !self.capabilities.contains(capability) {
-                    return Err(StackForgeError::MissingCapability {
+                    return Err(ScafflareError::MissingCapability {
                         recipe: name.clone(),
                         capability: capability.clone(),
                     });
@@ -116,7 +116,7 @@ impl<'a, R: RecipeRegistry> Resolver<'a, R> {
         if let Some(position) = temporary.iter().position(|entry| entry == name) {
             let mut cycle = temporary[position..].to_vec();
             cycle.push(name.to_owned());
-            return Err(StackForgeError::DependencyCycle(cycle.join(" -> ")));
+            return Err(ScafflareError::DependencyCycle(cycle.join(" -> ")));
         }
 
         temporary.push(name.to_owned());
@@ -152,7 +152,7 @@ mod tests {
             self.0
                 .get(name)
                 .cloned()
-                .ok_or_else(|| StackForgeError::RecipeNotFound(name.to_owned()))
+                .ok_or_else(|| ScafflareError::RecipeNotFound(name.to_owned()))
         }
         fn source(&self) -> RegistrySource {
             RegistrySource::Filesystem
@@ -206,6 +206,6 @@ mod tests {
         let error = Resolver::new(&registry, Vec::<String>::new())
             .resolve(&["a".to_owned(), "b".to_owned()])
             .unwrap_err();
-        assert!(matches!(error, StackForgeError::Conflict { .. }));
+        assert!(matches!(error, ScafflareError::Conflict { .. }));
     }
 }

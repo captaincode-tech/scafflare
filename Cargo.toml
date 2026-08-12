@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-  "crates/stackforge-core",
-  "crates/stackforge-cli",
+  "crates/scafflare-core",
+  "crates/scafflare-cli",
 ]
 
 [workspace.package]
@@ -10,8 +10,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
-authors = ["StackForge Contributors"]
-repository = "https://github.com/stackforge/stackforge"
+authors = ["Scafflare Contributors"]
+repository = "https://github.com/scafflare/scafflare"
 
 [workspace.dependencies]
 anyhow = "1.0"

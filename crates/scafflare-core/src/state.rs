@@ -6,7 +6,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 
 pub const LOCKFILE_VERSION: u32 = 1;
 
@@ -63,22 +63,22 @@ impl ProjectState {
 }
 
 pub fn lockfile_path(root: &Path) -> PathBuf {
-    root.join(".stackforge").join("lock.yaml")
+    root.join(".scafflare").join("lock.yaml")
 }
 
 pub fn load_state(root: &Path) -> Result<ProjectState> {
     let path = lockfile_path(root);
     let input = fs::read_to_string(&path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
-            StackForgeError::MissingState(path.clone())
+            ScafflareError::MissingState(path.clone())
         } else {
-            StackForgeError::io(&path, error)
+            ScafflareError::io(&path, error)
         }
     })?;
     let state: ProjectState = serde_yaml::from_str(&input)
-        .map_err(|error| StackForgeError::InvalidState(error.to_string()))?;
+        .map_err(|error| ScafflareError::InvalidState(error.to_string()))?;
     if state.lockfile_version != LOCKFILE_VERSION {
-        return Err(StackForgeError::InvalidState(format!(
+        return Err(ScafflareError::InvalidState(format!(
             "unsupported lockfile_version `{}`",
             state.lockfile_version
         )));
@@ -88,7 +88,7 @@ pub fn load_state(root: &Path) -> Result<ProjectState> {
 
 pub fn serialize_state(state: &ProjectState) -> Result<Vec<u8>> {
     let mut output = serde_yaml::to_string(state)
-        .map_err(|error| StackForgeError::Serialization(error.to_string()))?;
+        .map_err(|error| ScafflareError::Serialization(error.to_string()))?;
     if !output.ends_with('\n') {
         output.push('\n');
     }

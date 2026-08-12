@@ -1,33 +1,33 @@
-# معماری StackForge MVP
+# معماری Scafflare MVP
 
 **وضعیت:** پذیرفته‌شده  
 **نسخهٔ هدف:** `0.1.0`
 
 ## هدف و مرزبندی
 
-StackForge یک CLI مستقل از زبان برای ساخت backendهای آمادهٔ production از Recipeهای YAML است. هسته فقط YAML، قالب و عملیات فایل را می‌شناسد؛ دانسته‌های Node.js، TypeScript، Express، Hono و Drizzle فقط در Recipeهای رسمی bundle شده قرار دارند. این جداسازی از الگوی template-based ابزارهای scaffolding الهام می‌گیرد، اما برخلاف ابزارهایی که hookهای اسکریپتی را به‌طور پیش‌فرض اجرا می‌کنند، اجرای command در StackForge کاملاً opt-in است.[1] [2]
+Scafflare یک CLI مستقل از زبان برای ساخت backendهای آمادهٔ production از Recipeهای YAML است. هسته فقط YAML، قالب و عملیات فایل را می‌شناسد؛ دانسته‌های Node.js، TypeScript، Express، Hono و Drizzle فقط در Recipeهای رسمی bundle شده قرار دارند. این جداسازی از الگوی template-based ابزارهای scaffolding الهام می‌گیرد، اما برخلاف ابزارهایی که hookهای اسکریپتی را به‌طور پیش‌فرض اجرا می‌کنند، اجرای command در Scafflare کاملاً opt-in است.[1] [2]
 
 > اصل امنیتی: **هر Recipe داده است، نه کد قابل اجرا.** Commandهای خارجی فقط به‌عنوان metadata نمایش داده می‌شوند و تنها با `--run-commands` اجرا خواهند شد.
 
 | مؤلفه | مسئولیت | وابستگی به اکوسیستم هدف |
 |---|---|---|
-| `stackforge-core::recipe` | parse، schema validation و discovery | ندارد |
-| `stackforge-core::resolver` | dependency، conflict، compatibility و capability | ندارد |
-| `stackforge-core::render` | قالب MiniJinja و variable context | ندارد |
-| `stackforge-core::merge` | merge عمیق JSON و strategyهای فایل | ندارد |
-| `stackforge-core::transaction` | staging، preview، commit و rollback | ندارد |
-| `stackforge-core::state` | lockfile نسخه‌دار `.stackforge/lock.yaml` | ندارد |
-| `stackforge-core::doctor` | کنترل وضعیت ابزار و پروژه | ندارد |
-| `stackforge-cli` | Clap، wizard، output human/JSON | ندارد |
+| `scafflare-core::recipe` | parse، schema validation و discovery | ندارد |
+| `scafflare-core::resolver` | dependency، conflict، compatibility و capability | ندارد |
+| `scafflare-core::render` | قالب MiniJinja و variable context | ندارد |
+| `scafflare-core::merge` | merge عمیق JSON و strategyهای فایل | ندارد |
+| `scafflare-core::transaction` | staging، preview، commit و rollback | ندارد |
+| `scafflare-core::state` | lockfile نسخه‌دار `.scafflare/lock.yaml` | ندارد |
+| `scafflare-core::doctor` | کنترل وضعیت ابزار و پروژه | ندارد |
+| `scafflare-cli` | Clap، wizard، output human/JSON | ندارد |
 | `recipes/official` | metadata، template و validation commandها | فقط در Recipe |
 
 ## ساختار workspace
 
 ```text
-stackforge/
+scafflare/
 ├── crates/
-│   ├── stackforge-core/   # library قابل تست
-│   └── stackforge-cli/    # binary تک‌فایل در انتشار
+│   ├── scafflare-core/   # library قابل تست
+│   └── scafflare-cli/    # binary تک‌فایل در انتشار
 ├── recipes/official/      # Recipeهای bundle شده
 ├── fixtures/              # recipe و خروجی‌های golden
 ├── docs/
@@ -112,7 +112,7 @@ variables:
 
 ## خطا و خروجی
 
-خطاها به صورت `StackForgeError` typed مدل می‌شوند. هر خطا شامل code پایدار، message قابل‌فهم، recipe و path (در صورت وجود) است. خروجی انسانی فقط concise و رنگی است؛ `--json` به جای آن یک envelope قابل‌ماشین می‌دهد. `--quiet` پیام‌های موفقیت را حذف می‌کند، نه خطاها را.
+خطاها به صورت `ScafflareError` typed مدل می‌شوند. هر خطا شامل code پایدار، message قابل‌فهم، recipe و path (در صورت وجود) است. خروجی انسانی فقط concise و رنگی است؛ `--json` به جای آن یک envelope قابل‌ماشین می‌دهد. `--quiet` پیام‌های موفقیت را حذف می‌کند، نه خطاها را.
 
 ## Registry
 

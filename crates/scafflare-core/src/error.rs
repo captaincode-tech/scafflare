@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, StackForgeError>;
+pub type Result<T> = std::result::Result<T, ScafflareError>;
 
 #[derive(Debug, Error)]
-pub enum StackForgeError {
+pub enum ScafflareError {
     #[error("recipe `{recipe}` is invalid: {reason}")]
     InvalidRecipe { recipe: String, reason: String },
 
@@ -40,7 +40,7 @@ pub enum StackForgeError {
     #[error("transaction failed while applying `{path}`: {reason}")]
     Transaction { path: PathBuf, reason: String },
 
-    #[error("project is not managed by StackForge: `{0}` is missing")]
+    #[error("project is not managed by Scafflare: `{0}` is missing")]
     MissingState(PathBuf),
 
     #[error("state file is invalid: {0}")]
@@ -60,7 +60,7 @@ pub enum StackForgeError {
     Serialization(String),
 }
 
-impl StackForgeError {
+impl ScafflareError {
     pub fn io(path: impl Into<PathBuf>, source: std::io::Error) -> Self {
         Self::Io {
             path: path.into(),

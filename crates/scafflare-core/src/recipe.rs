@@ -5,7 +5,7 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -106,7 +106,7 @@ pub struct LoadedRecipe {
 impl RecipeDocument {
     pub fn from_yaml(recipe_id: &str, input: &str) -> Result<Self> {
         let document: Self =
-            serde_yaml::from_str(input).map_err(|error| StackForgeError::InvalidRecipe {
+            serde_yaml::from_str(input).map_err(|error| ScafflareError::InvalidRecipe {
                 recipe: recipe_id.to_owned(),
                 reason: error.to_string(),
             })?;
@@ -117,19 +117,19 @@ impl RecipeDocument {
     pub fn validate(&self) -> Result<()> {
         let name = &self.metadata.name;
         if self.schema_version != 1 {
-            return Err(StackForgeError::InvalidRecipe {
+            return Err(ScafflareError::InvalidRecipe {
                 recipe: name.clone(),
                 reason: format!("unsupported schema_version `{}`", self.schema_version),
             });
         }
         if !is_kebab_case(name) {
-            return Err(StackForgeError::InvalidRecipe {
+            return Err(ScafflareError::InvalidRecipe {
                 recipe: name.clone(),
                 reason: "metadata.name must use kebab-case".to_owned(),
             });
         }
         if self.metadata.description.trim().is_empty() {
-            return Err(StackForgeError::InvalidRecipe {
+            return Err(ScafflareError::InvalidRecipe {
                 recipe: name.clone(),
                 reason: "metadata.description must not be empty".to_owned(),
             });
@@ -138,7 +138,7 @@ impl RecipeDocument {
         let mut prompt_keys = HashSet::new();
         for prompt in &self.prompts {
             if !is_identifier(&prompt.key) || !prompt_keys.insert(&prompt.key) {
-                return Err(StackForgeError::InvalidRecipe {
+                return Err(ScafflareError::InvalidRecipe {
                     recipe: name.clone(),
                     reason: format!(
                         "prompt key `{}` must be unique and identifier-like",
@@ -150,7 +150,7 @@ impl RecipeDocument {
 
         for key in self.variables.keys() {
             if !is_identifier(key) {
-                return Err(StackForgeError::InvalidRecipe {
+                return Err(ScafflareError::InvalidRecipe {
                     recipe: name.clone(),
                     reason: format!("variable key `{key}` must be identifier-like"),
                 });
@@ -161,7 +161,7 @@ impl RecipeDocument {
             validate_relative_path(name, &file.source)?;
             validate_relative_path(name, &file.destination)?;
             if !file.source.starts_with("templates/") {
-                return Err(StackForgeError::InvalidRecipe {
+                return Err(ScafflareError::InvalidRecipe {
                     recipe: name.clone(),
                     reason: format!("file source `{}` must live below templates/", file.source),
                 });
@@ -186,7 +186,7 @@ pub fn validate_relative_path(recipe: &str, value: &str) -> Result<()> {
             )
         })
     {
-        return Err(StackForgeError::UnsafePath {
+        return Err(ScafflareError::UnsafePath {
             recipe: recipe.to_owned(),
             path: value.to_owned(),
         });
@@ -213,19 +213,19 @@ pub fn evaluate_condition(
         (key.trim(), "!=", value.trim())
     } else {
         let value = variables.get(condition).ok_or_else(|| {
-            StackForgeError::InvalidInput(format!(
+            ScafflareError::InvalidInput(format!(
                 "condition references unknown variable `{condition}`"
             ))
         })?;
         return value.as_bool().ok_or_else(|| {
-            StackForgeError::InvalidInput(format!(
+            ScafflareError::InvalidInput(format!(
                 "condition `{condition}` must reference a boolean variable"
             ))
         });
     };
 
     let actual = variables.get(key).ok_or_else(|| {
-        StackForgeError::InvalidInput(format!("condition references unknown variable `{key}`"))
+        ScafflareError::InvalidInput(format!("condition references unknown variable `{key}`"))
     })?;
     let expected = expected.trim_matches('"').trim_matches('\'');
     let actual_text = match actual {
@@ -233,7 +233,7 @@ pub fn evaluate_condition(
         Value::Bool(value) => value.to_string(),
         Value::Number(value) => value.to_string(),
         _ => {
-            return Err(StackForgeError::InvalidInput(format!(
+            return Err(ScafflareError::InvalidInput(format!(
                 "condition `{condition}` uses unsupported value type"
             )))
         }

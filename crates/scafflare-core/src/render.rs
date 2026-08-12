@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use minijinja::{Environment, UndefinedBehavior};
 use serde_json::{Map, Value};
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 use crate::recipe::{evaluate_condition, FileStrategy};
 use crate::resolver::Resolution;
 
@@ -45,13 +45,13 @@ pub fn render_resolution(
                 continue;
             }
             let template = recipe.templates.get(&spec.source).ok_or_else(|| {
-                StackForgeError::InvalidRecipe {
+                ScafflareError::InvalidRecipe {
                     recipe: recipe_name.clone(),
                     reason: format!("template `{}` is referenced but missing", spec.source),
                 }
             })?;
             let template =
-                std::str::from_utf8(template).map_err(|error| StackForgeError::Render {
+                std::str::from_utf8(template).map_err(|error| ScafflareError::Render {
                     recipe: recipe_name.clone(),
                     file: spec.source.clone(),
                     reason: format!("template is not UTF-8: {error}"),
@@ -78,7 +78,7 @@ fn render_template(recipe: &str, source: &str, template: &str, context: &Value) 
     environment.set_undefined_behavior(UndefinedBehavior::Strict);
     environment
         .render_str(template, context)
-        .map_err(|error| StackForgeError::Render {
+        .map_err(|error| ScafflareError::Render {
             recipe: recipe.to_owned(),
             file: source.to_owned(),
             reason: error.to_string(),
@@ -92,6 +92,6 @@ mod tests {
     #[test]
     fn strict_renderer_reports_missing_variable() {
         let result = render_template("test", "file", "{{ missing }}", &Value::Null);
-        assert!(matches!(result, Err(StackForgeError::Render { .. })));
+        assert!(matches!(result, Err(ScafflareError::Render { .. })));
     }
 }

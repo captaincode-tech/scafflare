@@ -1,5 +1,5 @@
 lockfile_version: 1
-project_name: stackforge-generated-clean
+project_name: scafflare-generated-clean
 recipes:
 - name: node
   version: 0.1.0
@@ -31,9 +31,9 @@ variables:
   database: sqlite
   framework: express
   pino_enabled: true
-  project_name: stackforge-generated-clean
+  project_name: scafflare-generated-clean
   project_pascal: StackforgeGeneratedClean
-  project_slug: stackforge-generated-clean
+  project_slug: scafflare-generated-clean
   vitest_enabled: true
   zod_enabled: true
 managed_files:

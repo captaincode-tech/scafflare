@@ -9,7 +9,7 @@
 
 ## تصمیم
 
-StackForge تمام renderها را ابتدا در یک staging directory تولید می‌کند. پیش از commit، preview نمایش داده می‌شود و در صورت نیاز به overwrite تأیید می‌گیرد. هنگام commit از backup موقت برای فایل‌های جایگزین‌شده استفاده می‌شود. شکست commit موجب rollback best-effort می‌شود و lockfile فقط پس از commit کامل نوشته می‌شود.
+Scafflare تمام renderها را ابتدا در یک staging directory تولید می‌کند. پیش از commit، preview نمایش داده می‌شود و در صورت نیاز به overwrite تأیید می‌گیرد. هنگام commit از backup موقت برای فایل‌های جایگزین‌شده استفاده می‌شود. شکست commit موجب rollback best-effort می‌شود و lockfile فقط پس از commit کامل نوشته می‌شود.
 
 `validation_commands` و `post_generation_instructions` در Recipe نگه‌داری می‌شوند، اما commandها فقط با `--run-commands` و پس از نمایش کامل آرگومان‌ها اجرا می‌شوند. هیچ shell، interpolation یا command string از Recipe به‌طور خودکار اجرا نمی‌شود.
 

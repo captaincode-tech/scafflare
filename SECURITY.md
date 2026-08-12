@@ -10,4 +10,4 @@
 
 ## مدل امنیتی Recipe
 
-Recipe به‌صورت پیش‌فرض دادهٔ declarative است. StackForge مسیرهای absolute، `..`، prefixهای Windows و مسیرهای خارج از sandbox را رد می‌کند. commandهای خارجی از Recipe فقط برای نمایش و اجرای صریح `--run-commands` نگه‌داری می‌شوند؛ commandهای string/shell-form قابل اجرا نیستند. Registry آنلاین و اجرای hook اسکریپتی در MVP وجود ندارد.
+Recipe به‌صورت پیش‌فرض دادهٔ declarative است. Scafflare مسیرهای absolute، `..`، prefixهای Windows و مسیرهای خارج از sandbox را رد می‌کند. commandهای خارجی از Recipe فقط برای نمایش و اجرای صریح `--run-commands` نگه‌داری می‌شوند؛ commandهای string/shell-form قابل اجرا نیستند. Registry آنلاین و اجرای hook اسکریپتی در MVP وجود ندارد.

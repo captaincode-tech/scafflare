@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use include_dir::{include_dir, Dir};
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 use crate::recipe::{LoadedRecipe, RecipeDocument};
 
 static OFFICIAL_RECIPES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../recipes/official");
@@ -45,7 +45,7 @@ impl RecipeRegistry for BundledRegistry {
     fn get(&self, name: &str) -> Result<LoadedRecipe> {
         let directory = OFFICIAL_RECIPES
             .get_dir(name)
-            .ok_or_else(|| StackForgeError::RecipeNotFound(name.to_owned()))?;
+            .ok_or_else(|| ScafflareError::RecipeNotFound(name.to_owned()))?;
         load_embedded_recipe(directory, name)
     }
 
@@ -68,10 +68,10 @@ impl FilesystemRegistry {
 impl RecipeRegistry for FilesystemRegistry {
     fn list(&self) -> Result<Vec<String>> {
         let entries =
-            fs::read_dir(&self.root).map_err(|error| StackForgeError::io(&self.root, error))?;
+            fs::read_dir(&self.root).map_err(|error| ScafflareError::io(&self.root, error))?;
         let mut names = Vec::new();
         for entry in entries {
-            let entry = entry.map_err(|error| StackForgeError::io(&self.root, error))?;
+            let entry = entry.map_err(|error| ScafflareError::io(&self.root, error))?;
             if entry.path().join("recipe.yaml").is_file() {
                 names.push(entry.file_name().to_string_lossy().to_string());
             }
@@ -84,29 +84,29 @@ impl RecipeRegistry for FilesystemRegistry {
         let root = self.root.join(name);
         let recipe_path = root.join("recipe.yaml");
         if !recipe_path.is_file() {
-            return Err(StackForgeError::RecipeNotFound(name.to_owned()));
+            return Err(ScafflareError::RecipeNotFound(name.to_owned()));
         }
         let raw = fs::read_to_string(&recipe_path)
-            .map_err(|error| StackForgeError::io(&recipe_path, error))?;
+            .map_err(|error| ScafflareError::io(&recipe_path, error))?;
         let document = RecipeDocument::from_yaml(name, &raw)?;
         let mut templates = BTreeMap::new();
         let templates_root = root.join("templates");
         if templates_root.exists() {
             for entry in walkdir::WalkDir::new(&templates_root) {
-                let entry = entry.map_err(|error| StackForgeError::InvalidRecipe {
+                let entry = entry.map_err(|error| ScafflareError::InvalidRecipe {
                     recipe: name.to_owned(),
                     reason: error.to_string(),
                 })?;
                 if entry.file_type().is_file() {
                     let relative = entry.path().strip_prefix(&root).map_err(|error| {
-                        StackForgeError::InvalidRecipe {
+                        ScafflareError::InvalidRecipe {
                             recipe: name.to_owned(),
                             reason: error.to_string(),
                         }
                     })?;
                     let relative = relative.to_string_lossy().replace('\\', "/");
                     let content = fs::read(entry.path())
-                        .map_err(|error| StackForgeError::io(entry.path(), error))?;
+                        .map_err(|error| ScafflareError::io(entry.path(), error))?;
                     templates.insert(relative, content);
                 }
             }
@@ -126,13 +126,13 @@ fn load_embedded_recipe(directory: &Dir<'_>, recipe_name: &str) -> Result<Loaded
     let recipe_file = directory
         .files()
         .find(|file| file.path().file_name().and_then(|name| name.to_str()) == Some("recipe.yaml"))
-        .ok_or_else(|| StackForgeError::InvalidRecipe {
+        .ok_or_else(|| ScafflareError::InvalidRecipe {
             recipe: recipe_name.to_owned(),
             reason: "missing recipe.yaml".to_owned(),
         })?;
     let raw = recipe_file
         .contents_utf8()
-        .ok_or_else(|| StackForgeError::InvalidRecipe {
+        .ok_or_else(|| ScafflareError::InvalidRecipe {
             recipe: recipe_name.to_owned(),
             reason: "recipe.yaml is not UTF-8".to_owned(),
         })?;

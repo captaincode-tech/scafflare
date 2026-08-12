@@ -1,6 +1,6 @@
 # golden-api
 
-Backend TypeScript تولیدشده با StackForge، با معماری **Minimal**.
+Backend TypeScript تولیدشده با Scafflare، با معماری **Minimal**.
 
 ## شروع سریع
 

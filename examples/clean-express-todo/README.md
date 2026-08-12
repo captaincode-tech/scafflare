@@ -1,6 +1,6 @@
-# stackforge-generated-clean
+# scafflare-generated-clean
 
-Backend TypeScript تولیدشده با StackForge، با معماری **Clean**.
+Backend TypeScript تولیدشده با Scafflare، با معماری **Clean**.
 
 ## ساختار Todo
 

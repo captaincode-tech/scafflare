@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::error::{Result, StackForgeError};
+use crate::error::{Result, ScafflareError};
 use crate::recipe::FileStrategy;
 use crate::render::RenderedFile;
 
@@ -78,7 +78,7 @@ pub fn plan_files(root: &Path, rendered: &[RenderedFile]) -> Result<FilePlan> {
             FileStrategy::Create => {
                 if let Some(current) = existing {
                     if current != file.contents {
-                        return Err(StackForgeError::FileConflict {
+                        return Err(ScafflareError::FileConflict {
                             path: file.destination.clone(),
                             reason: format!(
                                 "recipe `{}` uses create but the file already exists",
@@ -99,7 +99,7 @@ pub fn plan_files(root: &Path, rendered: &[RenderedFile]) -> Result<FilePlan> {
             }
             FileStrategy::Fail => {
                 if target_exists {
-                    return Err(StackForgeError::FileConflict {
+                    return Err(ScafflareError::FileConflict {
                         path: file.destination.clone(),
                         reason: format!("recipe `{}` requires this path not to exist", file.recipe),
                     });
@@ -139,7 +139,7 @@ pub fn plan_files(root: &Path, rendered: &[RenderedFile]) -> Result<FilePlan> {
                 let right = parse_json(&file.destination, &file.contents)?;
                 let merged = deep_merge(left, right);
                 let contents = serde_json::to_vec_pretty(&merged)
-                    .map_err(|error| StackForgeError::Serialization(error.to_string()))?
+                    .map_err(|error| ScafflareError::Serialization(error.to_string()))?
                     .into_iter()
                     .chain(std::iter::once(b'\n'))
                     .collect::<Vec<_>>();
@@ -178,7 +178,7 @@ pub fn plan_files(root: &Path, rendered: &[RenderedFile]) -> Result<FilePlan> {
             Ok(existing) if existing == contents => ChangeKind::Unchanged,
             Ok(_) => ChangeKind::Update,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => ChangeKind::Create,
-            Err(error) => return Err(StackForgeError::io(&target, error)),
+            Err(error) => return Err(ScafflareError::io(&target, error)),
         };
         let recipe = owners.remove(&path).unwrap_or_else(|| "unknown".to_owned());
         plan.changes.push(PlannedChange {
@@ -230,7 +230,7 @@ fn desired_contents(
                 let merged = deep_merge(left, parse_json(target, &file.contents)?);
                 value = Some(
                     serde_json::to_vec_pretty(&merged)
-                        .map_err(|error| StackForgeError::Serialization(error.to_string()))?
+                        .map_err(|error| ScafflareError::Serialization(error.to_string()))?
                         .into_iter()
                         .chain(std::iter::once(b'\n'))
                         .collect(),
@@ -242,7 +242,7 @@ fn desired_contents(
 }
 
 fn parse_json(path: &Path, bytes: &[u8]) -> Result<Value> {
-    serde_json::from_slice(bytes).map_err(|error| StackForgeError::FileConflict {
+    serde_json::from_slice(bytes).map_err(|error| ScafflareError::FileConflict {
         path: path.to_path_buf(),
         reason: format!("valid JSON is required for merge_json: {error}"),
     })
