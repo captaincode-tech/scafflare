@@ -1,0 +1,4 @@
+export type Todo = { id: number; title: string; completed: boolean; createdAt: string; updatedAt: string };
+export type CreateTodoInput = { title: string };
+export type UpdateTodoInput = { title?: string; completed?: boolean };
+export class TodoNotFoundError extends Error { constructor(id: number) { super(`Todo ${id} was not found`); this.name = "TodoNotFoundError"; } }

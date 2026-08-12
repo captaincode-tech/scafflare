@@ -38,6 +38,19 @@ pub struct RecipeMetadata {
     pub name: String,
     pub version: Version,
     pub description: String,
+    #[serde(default)]
+    pub wizard_entrypoint: bool,
+    #[serde(default)]
+    pub capability_probes: Vec<CapabilityProbe>,
+    #[serde(default)]
+    pub activation_variables: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityProbe {
+    pub capability: String,
+    pub program: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -45,10 +58,43 @@ pub struct RecipeMetadata {
 pub struct Prompt {
     pub key: String,
     pub message: String,
+    #[serde(default = "default_prompt_kind")]
+    pub kind: PromptKind,
+    #[serde(default)]
+    pub options: Vec<PromptOption>,
+    #[serde(default)]
+    pub recipes: Vec<String>,
     #[serde(default)]
     pub required: bool,
     #[serde(default)]
     pub default: Option<Value>,
+    #[serde(default)]
+    pub when: Option<String>,
+    #[serde(default)]
+    pub order: u16,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PromptKind {
+    Select,
+    Confirm,
+    Text,
+}
+
+fn default_prompt_kind() -> PromptKind {
+    PromptKind::Text
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromptOption {
+    pub label: String,
+    pub value: Value,
+    #[serde(default)]
+    pub recipes: Vec<String>,
+    #[serde(default)]
+    pub variables: BTreeMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

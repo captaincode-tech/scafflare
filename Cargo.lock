@@ -381,6 +381,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "scafflare"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "console",
+ "dialoguer",
+ "scafflare-core",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
+name = "scafflare-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "include_dir",
+ "minijinja",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "walkdir",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -462,37 +493,6 @@ name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
-
-[[package]]
-name = "scafflare"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "console",
- "dialoguer",
- "serde",
- "serde_json",
- "serde_yaml",
- "scafflare-core",
-]
-
-[[package]]
-name = "scafflare-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "include_dir",
- "minijinja",
- "semver",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "tempfile",
- "thiserror",
- "walkdir",
-]
 
 [[package]]
 name = "strsim"

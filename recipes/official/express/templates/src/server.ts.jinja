@@ -1,4 +1,7 @@
-import express, { type NextFunction, type Request, type Response } from "express";
+import express from "express";
+{% if not ((architecture == "clean" and database == "sqlite") or architecture == "layered") %}
+import type { NextFunction, Request, Response } from "express";
+{% endif %}
 
 import { env } from "./config/env.js";
 {% if architecture == "clean" and database == "sqlite" %}
@@ -6,6 +9,11 @@ import { DrizzleTodoRepository } from "./database/drizzle-todo-repository.js";
 import { db } from "./database/client.js";
 import { TodoController } from "./modules/todos/controller.js";
 import { createTodoRouter, errorHandler } from "./modules/todos/routes-express.js";
+import { TodoService } from "./modules/todos/service.js";
+{% elif architecture == "layered" %}
+import { TodoController } from "./modules/todos/controller.js";
+import { InMemoryTodoRepository } from "./modules/todos/repository.js";
+import { createTodoRouter, layeredErrorHandler } from "./modules/todos/routes-express.js";
 import { TodoService } from "./modules/todos/service.js";
 {% endif %}
 {% if pino_enabled %}
@@ -25,6 +33,11 @@ const todoRepository = new DrizzleTodoRepository(db);
 const todoController = new TodoController(new TodoService(todoRepository));
 app.use(createTodoRouter(todoController));
 app.use(errorHandler);
+{% elif architecture == "layered" %}
+const todoRepository = new InMemoryTodoRepository();
+const todoController = new TodoController(new TodoService(todoRepository));
+app.use("/todos", createTodoRouter(todoController));
+app.use(layeredErrorHandler);
 {% else %}
 app.use((_request: Request, response: Response) => {
   response.status(404).json({ error: "Not found" });

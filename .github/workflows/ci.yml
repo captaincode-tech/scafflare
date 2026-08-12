@@ -49,3 +49,16 @@ jobs:
           for recipe in recipes/official/*; do
             cargo run -q -p scafflare -- recipe validate "$recipe/recipe.yaml" --quiet
           done
+
+  fixture-matrix:
+    name: Generate and validate supported fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+      - name: Generate, install, audit, typecheck, lint, test, and build fixtures
+        shell: bash
+        run: scripts/verify-fixtures.sh

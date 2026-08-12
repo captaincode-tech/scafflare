@@ -1,0 +1,6 @@
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { TodoNotFoundError } from "./domain.js";
+import type { TodoController } from "./controller.js";
+const id=(raw:string)=>{const value=Number(raw);if(!Number.isInteger(value)||value<1)throw new Error("id must be positive");return value;};
+export function createTodoRouter(controller:TodoController){const router=Router();const run=(fn:()=>Promise<unknown>,status=200)=>async(_req:Request,res:Response,next:NextFunction)=>{try{res.status(status).json(await fn());}catch(error){next(error);}};router.get("/",run(()=>controller.list()));router.get("/:id",(req,res,next)=>run(()=>controller.get(id(req.params.id)))(req,res,next));router.post("/",(req,res,next)=>run(()=>controller.create({title:String(req.body?.title??"")}),201)(req,res,next));router.patch("/:id",(req,res,next)=>run(()=>controller.update(id(req.params.id),req.body??{}))(req,res,next));router.delete("/:id",async(req,res,next)=>{try{await controller.delete(id(req.params.id));res.status(204).end();}catch(error){next(error);}});return router;}
+export function layeredErrorHandler(error:unknown,_req:Request,res:Response,_next:NextFunction){res.status(error instanceof TodoNotFoundError?404:400).json({error:error instanceof Error?error.message:"invalid request"});}

@@ -1,20 +1,62 @@
 schema_version: 1
 metadata:
   name: node
-  version: 0.1.0
-  description: Node.js runtime baseline with secure package metadata
-depends_on: []
+  version: 0.2.0
+  description: Node.js and TypeScript backend baseline with secure package metadata
+  wizard_entrypoint: true
+  capability_probes:
+    - capability: node_runtime
+      program: node
+    - capability: npm
+      program: npm
+prompts:
+  - key: framework
+    message: HTTP framework
+    kind: select
+    default: express
+    order: 10
+    options:
+      - { label: Express, value: express, recipes: [express] }
+      - { label: Hono, value: hono, recipes: [hono] }
+      - { label: None, value: none }
+  - key: architecture
+    message: Architecture
+    kind: select
+    default: minimal
+    order: 20
+    options:
+      - { label: Minimal, value: minimal, recipes: [architecture-minimal] }
+      - { label: Layered, value: layered, recipes: [architecture-layered] }
+      - { label: Clean, value: clean, recipes: [architecture-clean] }
+  - key: database
+    message: Database
+    kind: select
+    default: none
+    order: 30
+    options:
+      - { label: None, value: none }
+      - { label: SQLite with LibSQL and Drizzle, value: sqlite, recipes: [sqlite-libsql, drizzle] }
+  - { key: pino_enabled, message: Enable Pino logging?, kind: confirm, default: false, order: 40, recipes: [pino] }
+  - { key: vitest_enabled, message: Enable Vitest?, kind: confirm, default: false, order: 50, recipes: [vitest] }
+  - { key: biome_enabled, message: Enable Biome?, kind: confirm, default: false, order: 60, recipes: [biome] }
+  - { key: hooks_enabled, message: Enable Husky and lint-staged?, kind: confirm, default: false, order: 70, recipes: [husky-lint-staged] }
+  - { key: github_actions_enabled, message: Enable GitHub Actions?, kind: confirm, default: false, order: 80, recipes: [github-actions] }
+variables:
+  framework: express
+  architecture: minimal
+  database: none
+  pino_enabled: false
+  vitest_enabled: false
+  biome_enabled: false
+  hooks_enabled: false
+  github_actions_enabled: false
+depends_on: [typescript]
 compatible_with: []
 conflicts: []
-required_capabilities:
-  - node-runtime
+required_capabilities: [node_runtime]
 files:
-  - source: templates/package.fragment.json.jinja
-    destination: package.json
-    strategy: merge_json
-  - source: templates/.gitignore.jinja
-    destination: .gitignore
-    strategy: create
+  - { source: templates/package.fragment.json.jinja, destination: package.json, strategy: merge_json }
+  - { source: templates/.gitignore.jinja, destination: .gitignore, strategy: create }
 validation_commands:
   - [npm, run, typecheck]
 post_generation_instructions:

@@ -3,6 +3,8 @@ metadata:
   name: husky-lint-staged
   version: 0.1.0
   description: Git hooks using Husky and lint-staged
+  activation_variables:
+    hooks_enabled: true
 depends_on:
   - biome
 compatible_with: []

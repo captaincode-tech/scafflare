@@ -40,7 +40,7 @@ export function createTodoRoutes(controller: TodoController): Hono {
       return context.json({ error: "Validation failed", details: error.flatten() }, 400);
     }
     if (error instanceof AppError) {
-      return context.json({ error: error.message, code: error.code }, error.statusCode);
+      return context.json({ error: error.message, code: error.code }, error.statusCode === 404 ? 404 : 400);
     }
     console.error(error);
     return context.json({ error: "Internal server error" }, 500);

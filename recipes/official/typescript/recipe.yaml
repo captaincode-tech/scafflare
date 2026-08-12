@@ -3,8 +3,7 @@ metadata:
   name: typescript
   version: 0.1.0
   description: Strict TypeScript and native ESM configuration
-depends_on:
-  - node
+depends_on: []
 compatible_with: []
 conflicts: []
 required_capabilities: []

@@ -8,6 +8,11 @@ import { db } from "./database/client.js";
 import { TodoController } from "./modules/todos/controller.js";
 import { createTodoRoutes } from "./modules/todos/routes-hono.js";
 import { TodoService } from "./modules/todos/service.js";
+{% elif architecture == "layered" %}
+import { TodoController } from "./modules/todos/controller.js";
+import { InMemoryTodoRepository } from "./modules/todos/repository.js";
+import { createTodoRoutes } from "./modules/todos/routes-hono.js";
+import { TodoService } from "./modules/todos/service.js";
 {% endif %}
 {% if pino_enabled %}
 import { logger } from "./logger.js";
@@ -20,6 +25,10 @@ app.get("/health", (context) => context.json({ status: "ok" }));
 const todoRepository = new DrizzleTodoRepository(db);
 const todoController = new TodoController(new TodoService(todoRepository));
 app.route("/", createTodoRoutes(todoController));
+{% elif architecture == "layered" %}
+const todoRepository = new InMemoryTodoRepository();
+const todoController = new TodoController(new TodoService(todoRepository));
+app.route("/todos", createTodoRoutes(todoController));
 {% else %}
 app.notFound((context) => context.json({ error: "Not found" }, 404));
 {% endif %}

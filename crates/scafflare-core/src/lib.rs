@@ -99,8 +99,18 @@ fn preview_generation<R: RecipeRegistry>(
 ) -> Result<GenerationPreview> {
     let resolution = Resolver::new(registry, capabilities).resolve(&recipes)?;
     let variables = build_context(&resolution, &state.variables);
-    let rendered = render_resolution(&resolution, &variables)?;
+    let mut rendered = render_resolution(&resolution, &variables)?;
+    for file in &mut rendered {
+        if matches!(file.strategy, recipe::FileStrategy::Create)
+            && state
+                .managed_files
+                .contains_key(&file.destination.to_string_lossy().to_string())
+        {
+            file.strategy = recipe::FileStrategy::Replace;
+        }
+    }
     let mut plan = plan::plan_files(root, &rendered)?;
+    guard_modified_managed_files(root, &state, &mut plan, false)?;
     let mut next_state = state;
     next_state.variables = variables.clone();
     next_state.recipes = resolution
@@ -121,6 +131,44 @@ fn preview_generation<R: RecipeRegistry>(
     })
 }
 
+fn guard_modified_managed_files(
+    root: &Path,
+    state: &ProjectState,
+    plan: &mut FilePlan,
+    preserve: bool,
+) -> Result<()> {
+    for change in &mut plan.changes {
+        if !matches!(
+            change.kind,
+            ChangeKind::Create | ChangeKind::Update | ChangeKind::Delete
+        ) {
+            continue;
+        }
+        let Some(managed) = state
+            .managed_files
+            .get(change.path.to_string_lossy().as_ref())
+        else {
+            continue;
+        };
+        let path = root.join(&change.path);
+        if path.exists() {
+            let current = fs::read(&path).map_err(|error| ScafflareError::io(&path, error))?;
+            if sha256_hex(&current) != managed.sha256 {
+                if preserve {
+                    change.kind = ChangeKind::Skip;
+                    change.contents = None;
+                } else {
+                    return Err(ScafflareError::FileConflict {
+                        path: change.path.clone(),
+                        reason: "refusing to overwrite a user-modified managed file".to_owned(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn preview_remove<R: RecipeRegistry>(
     root: &Path,
     registry: &R,
@@ -134,17 +182,11 @@ pub fn preview_remove<R: RecipeRegistry>(
         )));
     }
 
+    let removed = registry.get(recipe)?;
     let mut next_state = current_state.clone();
     next_state.remove_recipe(recipe);
-    for (flag, owner) in [
-        ("pino_enabled", "pino"),
-        ("vitest_enabled", "vitest"),
-        ("biome_enabled", "biome"),
-        ("zod_enabled", "zod"),
-    ] {
-        next_state
-            .variables
-            .insert(flag.to_owned(), Value::Bool(next_state.has_recipe(owner)));
+    for key in removed.document.metadata.activation_variables.keys() {
+        next_state.variables.remove(key);
     }
 
     let requested: Vec<String> = next_state
@@ -173,13 +215,6 @@ pub fn preview_remove<R: RecipeRegistry>(
         if !still_rendered && managed.recipes.len() == 1 && managed.recipes[0] == recipe {
             let path = root.join(relative);
             if path.exists() {
-                let current = fs::read(&path).map_err(|error| ScafflareError::io(&path, error))?;
-                if sha256_hex(&current) != managed.sha256 {
-                    return Err(ScafflareError::FileConflict {
-                        path: relative.into(),
-                        reason: "refusing to delete a user-modified managed file".to_owned(),
-                    });
-                }
                 plan.changes.push(PlannedChange {
                     kind: ChangeKind::Delete,
                     path: relative.into(),
@@ -189,6 +224,8 @@ pub fn preview_remove<R: RecipeRegistry>(
             }
         }
     }
+
+    guard_modified_managed_files(root, &current_state, &mut plan, true)?;
 
     next_state.recipes = resolution
         .recipes
@@ -377,7 +414,7 @@ mod integration_tests {
                 ("vitest_enabled".to_owned(), Value::Bool(false)),
                 ("biome_enabled".to_owned(), Value::Bool(false)),
             ]),
-            capabilities: BTreeSet::from(["node-runtime".to_owned(), "npm".to_owned()]),
+            capabilities: BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
         }
     }
 
@@ -399,7 +436,7 @@ mod integration_tests {
             &root,
             &registry,
             vec!["architecture-minimal".to_owned()],
-            BTreeSet::from(["node-runtime".to_owned(), "npm".to_owned()]),
+            BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
         )
         .unwrap();
         assert!(!second.plan.has_changes());
@@ -408,26 +445,37 @@ mod integration_tests {
     #[test]
     fn resolver_rejects_official_framework_conflict() {
         let registry = BundledRegistry::new();
-        let result = Resolver::new(&registry, BTreeSet::from(["node-runtime".to_owned()]))
+        let result = Resolver::new(&registry, BTreeSet::from(["node_runtime".to_owned()]))
             .resolve(&["express".to_owned(), "hono".to_owned()]);
         assert!(matches!(result, Err(ScafflareError::Conflict { .. })));
     }
 
     #[test]
-    fn removal_refuses_user_modified_managed_file() {
+    fn removal_preserves_user_modified_managed_file() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join("safe-removal");
         let registry = BundledRegistry::new();
         let preview = preview_init(&root, &registry, minimal_request("safe-removal")).unwrap();
         commit(&root, &preview.plan).unwrap();
         fs::write(root.join("README.md"), "user modification\n").unwrap();
-        let result = preview_remove(
+        let (plan, _) = preview_remove(
             &root,
             &registry,
             "architecture-minimal",
-            BTreeSet::from(["node-runtime".to_owned(), "npm".to_owned()]),
+            BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
+        )
+        .unwrap();
+        assert!(
+            plan.changes
+                .iter()
+                .any(|change| change.path == Path::new("README.md")
+                    && change.kind == ChangeKind::Skip)
         );
-        assert!(matches!(result, Err(ScafflareError::FileConflict { .. })));
+        commit(&root, &plan).unwrap();
+        assert_eq!(
+            fs::read_to_string(root.join("README.md")).unwrap(),
+            "user modification\n"
+        );
     }
 
     #[test]

@@ -3,6 +3,8 @@ metadata:
   name: zod
   version: 0.1.0
   description: Runtime validation with Zod
+  activation_variables:
+    zod_enabled: true
 depends_on:
   - typescript
 compatible_with: []

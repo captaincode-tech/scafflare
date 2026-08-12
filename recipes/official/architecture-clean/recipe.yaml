@@ -5,6 +5,7 @@ metadata:
   description: Clean architecture with typed Todo CRUD when SQLite is selected
 depends_on:
   - typescript
+  - zod
 compatible_with: []
 conflicts:
   - architecture-minimal

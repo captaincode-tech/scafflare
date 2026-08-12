@@ -29,6 +29,9 @@ pub fn apply_plan(root: &Path, plan: &FilePlan) -> Result<()> {
     }
 
     fs::create_dir_all(root).map_err(|error| ScafflareError::io(root, error))?;
+    for change in &changes {
+        ensure_safe_target(root, &change.path)?;
+    }
     let transaction_root = root
         .join(".scafflare")
         .join("transactions")
@@ -45,14 +48,13 @@ pub fn apply_plan(root: &Path, plan: &FilePlan) -> Result<()> {
                 .parent()
                 .expect("relative path must have a parent");
             fs::create_dir_all(parent).map_err(|error| ScafflareError::io(parent, error))?;
-            let contents =
-                change
-                    .contents
-                    .as_ref()
-                    .ok_or_else(|| ScafflareError::Transaction {
-                        path: change.path.clone(),
-                        reason: "planned write is missing staged contents".to_owned(),
-                    })?;
+            let contents = change
+                .contents
+                .as_ref()
+                .ok_or_else(|| ScafflareError::Transaction {
+                    path: change.path.clone(),
+                    reason: "planned write is missing staged contents".to_owned(),
+                })?;
             fs::write(&staged_path, contents)
                 .map_err(|error| ScafflareError::io(&staged_path, error))?;
         }
@@ -120,6 +122,39 @@ fn apply_change(
         path: change.path.clone(),
         backup,
     });
+    Ok(())
+}
+
+fn ensure_safe_target(root: &Path, relative: &Path) -> Result<()> {
+    if relative.is_absolute()
+        || relative.components().any(|part| {
+            matches!(
+                part,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err(ScafflareError::Transaction {
+            path: relative.to_path_buf(),
+            reason: "transaction path must be relative".to_owned(),
+        });
+    }
+    let mut current = root.to_path_buf();
+    for part in relative.components() {
+        if let std::path::Component::Normal(name) = part {
+            current.push(name);
+            if let Ok(metadata) = fs::symlink_metadata(&current) {
+                if metadata.file_type().is_symlink() {
+                    return Err(ScafflareError::Transaction {
+                        path: relative.to_path_buf(),
+                        reason: "refusing symbolic-link path component".to_owned(),
+                    });
+                }
+            }
+        }
+    }
     Ok(())
 }
 

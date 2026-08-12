@@ -1,0 +1,38 @@
+import { Hono } from "hono";
+
+import { TodoNotFoundError } from "./domain.js";
+import type { TodoController } from "./controller.js";
+
+function parseId(raw: string): number {
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error("id must be positive");
+  }
+  return value;
+}
+
+export function createTodoRoutes(controller: TodoController): Hono {
+  const router = new Hono();
+
+  router.get("/", async (context) => context.json(await controller.list()));
+  router.get("/:id", async (context) => context.json(await controller.get(parseId(context.req.param("id")))));
+  router.post("/", async (context) => {
+    const body = await context.req.json<{ title?: unknown }>();
+    return context.json(await controller.create({ title: String(body.title ?? "") }), 201);
+  });
+  router.patch("/:id", async (context) => {
+    const body = await context.req.json<Record<string, unknown>>();
+    return context.json(await controller.update(parseId(context.req.param("id")), body));
+  });
+  router.delete("/:id", async (context) => {
+    await controller.delete(parseId(context.req.param("id")));
+    return context.body(null, 204);
+  });
+
+  router.onError((error, context) => {
+    const status = error instanceof TodoNotFoundError ? 404 : 400;
+    return context.json({ error: error instanceof Error ? error.message : "invalid request" }, status);
+  });
+
+  return router;
+}

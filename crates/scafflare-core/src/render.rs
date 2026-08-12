@@ -28,6 +28,11 @@ pub fn build_context(
                 .or_insert_with(|| value.clone());
         }
     }
+    for recipe in &resolution.recipes {
+        for (key, value) in &recipe.document.metadata.activation_variables {
+            variables.insert(key.clone(), value.clone());
+        }
+    }
     variables
 }
 

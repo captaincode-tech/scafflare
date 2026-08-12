@@ -1,23 +1,21 @@
 schema_version: 1
 metadata:
   name: architecture-layered
-  version: 0.1.0
-  description: Layered backend structure with controller and service boundaries
-depends_on:
-  - typescript
+  version: 0.2.0
+  description: Layered architecture with routes, controllers, services and repositories
+variables: {}
+depends_on: [typescript]
 compatible_with: []
-conflicts:
-  - architecture-minimal
-  - architecture-clean
+conflicts: [architecture-minimal, architecture-clean]
 required_capabilities: []
 files:
-  - source: templates/src/server.ts.jinja
-    destination: src/server.ts
-    strategy: create
-    when: "framework == none"
-  - source: templates/README.md.jinja
-    destination: README.md
-    strategy: create
-validation_commands:
-  - [npm, run, build]
+  - { source: templates/src/modules/todos/domain.ts.jinja, destination: src/modules/todos/domain.ts, strategy: create }
+  - { source: templates/src/modules/todos/repository.ts.jinja, destination: src/modules/todos/repository.ts, strategy: create }
+  - { source: templates/src/modules/todos/service.ts.jinja, destination: src/modules/todos/service.ts, strategy: create }
+  - { source: templates/src/modules/todos/controller.ts.jinja, destination: src/modules/todos/controller.ts, strategy: create }
+  - { source: templates/src/modules/todos/routes-express.ts.jinja, destination: src/modules/todos/routes-express.ts, strategy: create, when: "framework == express" }
+  - { source: templates/src/modules/todos/routes-hono.ts.jinja, destination: src/modules/todos/routes-hono.ts, strategy: create, when: "framework == hono" }
+  - { source: templates/src/server-node.ts.jinja, destination: src/server.ts, strategy: create, when: "framework == none" }
+  - { source: templates/README.md.jinja, destination: README.md, strategy: create }
+validation_commands: [[npm, run, build]]
 post_generation_instructions: []

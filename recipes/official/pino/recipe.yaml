@@ -3,6 +3,8 @@ metadata:
   name: pino
   version: 0.1.0
   description: Structured Pino logging with environment-aware transport
+  activation_variables:
+    pino_enabled: true
 depends_on:
   - typescript
 compatible_with: []

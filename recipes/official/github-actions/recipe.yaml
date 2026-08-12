@@ -3,6 +3,8 @@ metadata:
   name: github-actions
   version: 0.1.0
   description: GitHub Actions CI for install, typecheck, lint, test and build
+  activation_variables:
+    github_actions_enabled: true
 depends_on:
   - typescript
 compatible_with: []

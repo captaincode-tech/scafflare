@@ -4,152 +4,89 @@ use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Confirm, Select};
-use serde::Serialize;
-use serde_json::Value;
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use scafflare_core::plan::{ChangeKind, FilePlan};
-use scafflare_core::recipe::RecipeDocument;
-use scafflare_core::registry::{BundledRegistry, RecipeRegistry};
+use scafflare_core::recipe::{evaluate_condition, Prompt, PromptKind, RecipeDocument};
+use scafflare_core::registry::{CompositeRegistry, RecipeRegistry};
 use scafflare_core::state::load_state;
 use scafflare_core::{
     commit, preview_add, preview_init, preview_remove, run_safe_validation_commands,
     validation_commands, GenerationPreview, GenerationRequest,
 };
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+use serde_json::Value;
 
 #[derive(Debug, Parser)]
-#[command(name = "scafflare", version = VERSION, about = "Composable, language-agnostic backend scaffolding")]
+#[command(
+    name = "scafflare",
+    version,
+    about = "Composable, language-agnostic backend scaffolding"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-
-    /// Emit machine-readable JSON to stdout.
+    #[arg(long, global = true, value_name = "DIR")]
+    recipe_root: Vec<PathBuf>,
     #[arg(long, global = true)]
     json: bool,
-
-    /// Suppress successful human-readable output.
     #[arg(long, global = true, short = 'q')]
     quiet: bool,
 }
-
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Create a project from composable recipes.
     Init(InitArgs),
-    /// Add one or more recipes to an existing Scafflare project.
     Add(ModifyArgs),
-    /// Remove a recipe and its unmodified, exclusively owned files.
     Remove(RemoveArgs),
-    /// List bundled recipes.
     List,
-    /// Diagnose Scafflare and the project state.
     Doctor(PathArgs),
-    /// Validate the current project's lockfile and installed recipes.
     Validate(PathArgs),
-    /// Work with standalone recipe files.
     Recipe {
         #[command(subcommand)]
         command: RecipeCommands,
     },
 }
-
 #[derive(Debug, Subcommand)]
 enum RecipeCommands {
-    /// Validate a recipe.yaml file and its local template references.
     Validate { path: PathBuf },
 }
-
 #[derive(Debug, Args)]
 struct InitArgs {
-    /// Project directory name.
     project_name: String,
-    /// Parent directory for the new project.
     #[arg(long, default_value = ".")]
     directory: PathBuf,
-    /// Skip wizard; provide selection flags instead.
     #[arg(long)]
     non_interactive: bool,
-    /// HTTP framework: express, hono, none.
-    #[arg(long, default_value = "express")]
-    framework: String,
-    /// Architecture: minimal, layered, clean.
-    #[arg(long, default_value = "minimal")]
-    architecture: String,
-    /// Database: sqlite, none.
-    #[arg(long, default_value = "none")]
-    database: String,
-    /// Enable Zod validation.
-    #[arg(long)]
-    zod: bool,
-    /// Enable Pino logging.
-    #[arg(long)]
-    pino: bool,
-    /// Enable Vitest.
-    #[arg(long)]
-    vitest: bool,
-    /// Enable Biome.
-    #[arg(long)]
-    biome: bool,
-    /// Enable Husky and lint-staged.
-    #[arg(long)]
-    hooks: bool,
-    /// Enable GitHub Actions.
-    #[arg(long)]
-    github_actions: bool,
-    /// Automatically approve the displayed file preview.
+    #[arg(long, value_name = "RECIPE")]
+    recipe: Vec<String>,
+    #[arg(long = "set", value_name = "KEY=VALUE")]
+    set: Vec<String>,
     #[arg(long, short = 'y')]
     yes: bool,
-    /// Run declared argv-form validation commands after commit.
     #[arg(long)]
     run_commands: bool,
 }
-
 #[derive(Debug, Args)]
 struct ModifyArgs {
-    /// Recipe names to add.
-    #[arg(required = true, num_args = 1..)]
+    #[arg(required=true, num_args=1..)]
     recipes: Vec<String>,
-    /// Existing project directory.
     #[arg(long, default_value = ".")]
     directory: PathBuf,
-    /// Automatically approve the displayed file preview.
     #[arg(long, short = 'y')]
     yes: bool,
-    /// Run declared argv-form validation commands after commit.
     #[arg(long)]
     run_commands: bool,
 }
-
 #[derive(Debug, Args)]
 struct RemoveArgs {
-    /// Installed recipe name.
     recipe: String,
-    /// Existing project directory.
     #[arg(long, default_value = ".")]
     directory: PathBuf,
-    /// Automatically approve the displayed file preview.
     #[arg(long, short = 'y')]
     yes: bool,
 }
-
 #[derive(Debug, Args)]
 struct PathArgs {
-    /// Project directory.
     #[arg(long, default_value = ".")]
     directory: PathBuf,
-}
-
-#[derive(Debug, Serialize)]
-struct JsonEnvelope<T: Serialize> {
-    ok: bool,
-    data: T,
-}
-
-#[derive(Debug, Serialize)]
-struct JsonError {
-    ok: bool,
-    error: String,
 }
 
 fn main() -> ExitCode {
@@ -159,12 +96,8 @@ fn main() -> ExitCode {
         Err(error) => {
             if cli.json {
                 println!(
-                    "{}",
-                    serde_json::to_string(&JsonError {
-                        ok: false,
-                        error: error.to_string()
-                    })
-                    .expect("JSON serialization cannot fail")
+                    "{{\"ok\":false,\"error\":{}}}",
+                    serde_json::to_string(&error.to_string()).unwrap()
                 );
             } else {
                 eprintln!("{} {error}", style("error:").red().bold());
@@ -173,227 +106,355 @@ fn main() -> ExitCode {
         }
     }
 }
-
 fn execute(cli: &Cli) -> anyhow::Result<()> {
     match &cli.command {
-        Commands::Init(args) => init(cli, args),
-        Commands::Add(args) => add(cli, args),
-        Commands::Remove(args) => remove(cli, args),
+        Commands::Init(a) => init(cli, a),
+        Commands::Add(a) => add(cli, a),
+        Commands::Remove(a) => remove(cli, a),
         Commands::List => list(cli),
-        Commands::Doctor(args) => doctor(cli, args),
-        Commands::Validate(args) => validate_project(cli, args),
+        Commands::Doctor(a) => doctor(cli, a),
+        Commands::Validate(a) => validate(cli, a),
         Commands::Recipe {
             command: RecipeCommands::Validate { path },
-        } => validate_recipe(cli, path),
+        } => validate_recipe(path),
     }
 }
-
+fn registry(cli: &Cli) -> CompositeRegistry {
+    CompositeRegistry::new(cli.recipe_root.clone())
+}
 fn init(cli: &Cli, args: &InitArgs) -> anyhow::Result<()> {
     if cli.json && !args.non_interactive {
-        anyhow::bail!("--json requires --non-interactive for init");
+        anyhow::bail!("--json requires --non-interactive");
     }
-    let selection = if args.non_interactive {
-        Selection::from_args(args)?
-    } else {
-        interactive_selection(args)?
-    };
-    let root = args.directory.join(&args.project_name);
+    let registry = registry(cli);
+    let (recipes, variables) = selection(&registry, args)?;
     let request = GenerationRequest {
         project_name: args.project_name.clone(),
-        recipes: selection.recipes(),
-        variables: selection.variables(&args.project_name),
-        capabilities: capabilities(),
+        recipes,
+        variables,
+        capabilities: capabilities(&registry)?,
     };
-    let registry = BundledRegistry::new();
+    let root = args.directory.join(&args.project_name);
     let preview = preview_init(&root, &registry, request)?;
-    execute_preview(cli, &root, preview, args.yes, args.run_commands)
+    apply_preview(cli, &root, preview, args.yes, args.run_commands)
 }
-
 fn add(cli: &Cli, args: &ModifyArgs) -> anyhow::Result<()> {
-    let registry = BundledRegistry::new();
+    let registry = registry(cli);
     let preview = preview_add(
         &args.directory,
         &registry,
         args.recipes.clone(),
-        capabilities(),
+        capabilities(&registry)?,
     )?;
-    execute_preview(cli, &args.directory, preview, args.yes, args.run_commands)
+    apply_preview(cli, &args.directory, preview, args.yes, args.run_commands)
 }
-
 fn remove(cli: &Cli, args: &RemoveArgs) -> anyhow::Result<()> {
-    let registry = BundledRegistry::new();
-    let (plan, state) = preview_remove(&args.directory, &registry, &args.recipe, capabilities())?;
-    emit_plan(cli, &plan)?;
-    if !confirm(cli, &plan, args.yes)? {
-        return Ok(());
-    }
-    commit(&args.directory, &plan)?;
-    if !cli.quiet && !cli.json {
-        println!(
-            "{} removed recipe `{}` from {}",
-            style("done").green().bold(),
-            args.recipe,
-            args.directory.display()
-        );
-    }
-    if cli.json {
-        emit_json(&serde_json::json!({"plan": plan, "state": state, "removed": args.recipe}))?;
-    }
-    Ok(())
-}
-
-fn list(cli: &Cli) -> anyhow::Result<()> {
-    let registry = BundledRegistry::new();
-    let mut recipes = Vec::new();
-    for name in registry.list()? {
-        let recipe = registry.get(&name)?;
-        recipes.push(serde_json::json!({
-            "name": recipe.document.metadata.name,
-            "version": recipe.document.metadata.version,
-            "description": recipe.document.metadata.description,
-        }));
-    }
-    if cli.json {
-        emit_json(&recipes)?;
-    } else {
-        println!("{} bundled recipes", style(recipes.len()).cyan().bold());
-        for recipe in recipes {
+    let registry = registry(cli);
+    let (plan, state) = preview_remove(
+        &args.directory,
+        &registry,
+        &args.recipe,
+        capabilities(&registry)?,
+    )?;
+    show_plan(cli, &plan);
+    if approve(cli, &plan, args.yes)? {
+        commit(&args.directory, &plan)?;
+        if cli.json {
             println!(
-                "  {}  {}",
-                style(recipe["name"].as_str().unwrap_or_default()).green(),
-                recipe["description"].as_str().unwrap_or_default()
+                "{}",
+                serde_json::json!({"ok":true,"plan":plan,"state":state})
             );
+        } else if !cli.quiet {
+            println!("{} removed `{}`", style("done").green().bold(), args.recipe);
         }
     }
     Ok(())
 }
-
-fn doctor(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
-    let node = command_available("node");
-    let npm = command_available("npm");
-    let state = load_state(&args.directory).ok();
-    let report = serde_json::json!({
-        "scafflare_version": VERSION,
-        "project": args.directory,
-        "node": node,
-        "npm": npm,
-        "managed_project": state.is_some(),
-        "installed_recipes": state.as_ref().map(|value| value.recipes.clone()).unwrap_or_default(),
-    });
+fn list(cli: &Cli) -> anyhow::Result<()> {
+    let r = registry(cli);
+    let entries:Vec<_>=r.list()?.into_iter().map(|name| { let d=r.get(&name).unwrap().document; serde_json::json!({"name":d.metadata.name,"description":d.metadata.description,"entrypoint":d.metadata.wizard_entrypoint})}).collect();
     if cli.json {
-        emit_json(&report)?;
+        println!("{}", serde_json::to_string(&entries)?);
     } else {
-        println!("{} Scafflare {}", style("doctor").cyan().bold(), VERSION);
-        println!("  node: {}", status(node));
-        println!("  npm:  {}", status(npm));
-        println!(
-            "  state: {}",
-            if state.is_some() {
-                style("healthy").green()
-            } else {
-                style("not initialized").yellow()
-            }
-        );
-    }
-    Ok(())
-}
-
-fn validate_project(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
-    let state = load_state(&args.directory)?;
-    let registry = BundledRegistry::new();
-    let mut checked = Vec::new();
-    for installed in &state.recipes {
-        let recipe = registry.get(&installed.name)?;
-        if recipe.document.metadata.version != installed.version {
-            anyhow::bail!(
-                "lockfile version for `{}` is {}, but registry supplies {}",
-                installed.name,
-                installed.version,
-                recipe.document.metadata.version
+        for value in entries {
+            println!(
+                "{}  {}",
+                style(value["name"].as_str().unwrap()).green(),
+                value["description"].as_str().unwrap()
             );
         }
-        checked.push(installed.name.clone());
-    }
-    let response = serde_json::json!({"valid": true, "recipes": checked});
-    if cli.json {
-        emit_json(&response)?;
-    } else if !cli.quiet {
-        println!(
-            "{} lockfile and {} recipes are valid",
-            style("valid").green().bold(),
-            checked.len()
-        );
     }
     Ok(())
 }
-
-fn validate_recipe(cli: &Cli, path: &Path) -> anyhow::Result<()> {
-    let contents = std::fs::read_to_string(path)?;
-    let fallback_name = path
+fn doctor(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
+    let r = registry(cli);
+    let probes = probes(&r)?;
+    let available = capabilities(&r)?;
+    let state = load_state(&args.directory).ok();
+    if cli.json {
+        println!(
+            "{}",
+            serde_json::json!({"capabilities":available,"probes":probes,"managed_project":state.is_some()})
+        );
+    } else {
+        for (capability, program) in probes {
+            println!(
+                "{capability} ({program}): {}",
+                if available.contains(&capability) {
+                    "available"
+                } else {
+                    "missing"
+                }
+            );
+        }
+    }
+    Ok(())
+}
+fn validate(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
+    let r = registry(cli);
+    let state = load_state(&args.directory)?;
+    for installed in &state.recipes {
+        if r.get(&installed.name)?.document.metadata.version != installed.version {
+            anyhow::bail!("recipe version mismatch for {}", installed.name);
+        }
+    }
+    if !cli.quiet {
+        println!("{} lockfile is valid", style("valid").green());
+    }
+    Ok(())
+}
+fn validate_recipe(path: &Path) -> anyhow::Result<()> {
+    let raw = std::fs::read_to_string(path)?;
+    let name = path
         .parent()
         .and_then(Path::file_name)
-        .and_then(|name| name.to_str())
+        .and_then(|n| n.to_str())
         .unwrap_or("recipe");
-    let recipe = RecipeDocument::from_yaml(fallback_name, &contents)?;
-    let root = path
-        .parent()
-        .ok_or_else(|| anyhow::anyhow!("recipe path has no parent"))?;
-    for file in &recipe.files {
+    let doc = RecipeDocument::from_yaml(name, &raw)?;
+    let root = path.parent().unwrap();
+    for file in &doc.files {
         if !root.join(&file.source).is_file() {
-            anyhow::bail!(
-                "recipe `{}` references missing template `{}`",
-                recipe.metadata.name,
-                file.source
-            );
+            anyhow::bail!("missing template {}", file.source);
         }
     }
-    let response = serde_json::json!({"valid": true, "name": recipe.metadata.name, "version": recipe.metadata.version});
-    if cli.json {
-        emit_json(&response)?;
-    } else if !cli.quiet {
-        println!(
-            "{} recipe `{}` is valid",
-            style("valid").green().bold(),
-            recipe.metadata.name
-        );
-    }
+    println!("valid recipe `{}`", doc.metadata.name);
     Ok(())
 }
 
-fn execute_preview(
+fn selection<R: RecipeRegistry>(
+    r: &R,
+    args: &InitArgs,
+) -> anyhow::Result<(Vec<String>, BTreeMap<String, Value>)> {
+    let mut recipes = if args.recipe.is_empty() {
+        let entries: Vec<_> = r
+            .list()?
+            .into_iter()
+            .filter(|name| {
+                r.get(name)
+                    .map(|x| x.document.metadata.wizard_entrypoint)
+                    .unwrap_or(false)
+            })
+            .collect();
+        if entries.len() != 1 {
+            anyhow::bail!(
+                "pass --recipe because registry has {} entrypoints",
+                entries.len()
+            );
+        }
+        entries
+    } else {
+        args.recipe.clone()
+    };
+    let mut vars = project_vars(&args.project_name);
+    let supplied = parse_sets(&args.set)?;
+    let mut prompts = Vec::new();
+    for name in &recipes {
+        let doc = r.get(name)?.document;
+        for (key, value) in doc.variables {
+            vars.entry(key).or_insert(value);
+        }
+        prompts.extend(doc.prompts);
+    }
+    prompts.sort_by_key(|p| p.order);
+    for prompt in prompts {
+        if !evaluate_condition(prompt.when.as_deref(), &vars)? {
+            continue;
+        }
+        let value = if let Some(v) = supplied.get(&prompt.key) {
+            v.clone()
+        } else if args.non_interactive {
+            prompt
+                .default
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("prompt {} needs --set", prompt.key))?
+        } else {
+            ask(&prompt)?
+        };
+        apply_prompt(&prompt, value, &mut recipes, &mut vars)?;
+    }
+    for (k, v) in supplied {
+        vars.insert(k, v);
+    }
+    recipes.sort();
+    recipes.dedup();
+    Ok((recipes, vars))
+}
+fn ask(prompt: &Prompt) -> anyhow::Result<Value> {
+    let t = ColorfulTheme::default();
+    match prompt.kind {
+        PromptKind::Select => {
+            let labels: Vec<_> = prompt.options.iter().map(|x| x.label.as_str()).collect();
+            let default = prompt
+                .default
+                .as_ref()
+                .and_then(|v| prompt.options.iter().position(|x| x.value == *v))
+                .unwrap_or(0);
+            let selected = Select::with_theme(&t)
+                .with_prompt(&prompt.message)
+                .items(&labels)
+                .default(default)
+                .interact()?;
+            Ok(prompt.options[selected].value.clone())
+        }
+        PromptKind::Confirm => Ok(Value::Bool(
+            Confirm::with_theme(&t)
+                .with_prompt(&prompt.message)
+                .default(
+                    prompt
+                        .default
+                        .as_ref()
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                )
+                .interact()?,
+        )),
+        PromptKind::Text => {
+            let mut field = Input::<String>::with_theme(&t).with_prompt(&prompt.message);
+            if let Some(default) = prompt.default.as_ref().and_then(Value::as_str) {
+                field = field.default(default.to_owned());
+            }
+            let value = field.interact_text()?;
+            if prompt.required && value.trim().is_empty() {
+                anyhow::bail!("prompt {} is required", prompt.key);
+            }
+            Ok(Value::String(value))
+        }
+    }
+}
+fn apply_prompt(
+    prompt: &Prompt,
+    value: Value,
+    recipes: &mut Vec<String>,
+    vars: &mut BTreeMap<String, Value>,
+) -> anyhow::Result<()> {
+    match prompt.kind {
+        PromptKind::Select => {
+            let opt = prompt
+                .options
+                .iter()
+                .find(|x| x.value == value)
+                .ok_or_else(|| anyhow::anyhow!("invalid value for {}", prompt.key))?;
+            recipes.extend(opt.recipes.iter().cloned());
+            for (k, v) in &opt.variables {
+                vars.insert(k.clone(), v.clone());
+            }
+        }
+        PromptKind::Confirm => {
+            if value
+                .as_bool()
+                .ok_or_else(|| anyhow::anyhow!("{} must be bool", prompt.key))?
+            {
+                recipes.extend(prompt.recipes.iter().cloned());
+            }
+        }
+        PromptKind::Text => {}
+    }
+    vars.insert(prompt.key.clone(), value);
+    Ok(())
+}
+fn parse_sets(items: &[String]) -> anyhow::Result<BTreeMap<String, Value>> {
+    let mut out = BTreeMap::new();
+    for item in items {
+        let (key, val) = item
+            .split_once('=')
+            .ok_or_else(|| anyhow::anyhow!("--set expects KEY=VALUE"))?;
+        out.insert(
+            key.to_owned(),
+            serde_json::from_str(val).unwrap_or_else(|_| Value::String(val.to_owned())),
+        );
+    }
+    Ok(out)
+}
+fn project_vars(name: &str) -> BTreeMap<String, Value> {
+    let slug = name.replace('_', "-");
+    let pascal = slug
+        .split('-')
+        .filter(|x| !x.is_empty())
+        .map(|x| {
+            let mut c = x.chars();
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
+        })
+        .collect();
+    BTreeMap::from([
+        ("project_name".into(), Value::String(name.into())),
+        ("project_slug".into(), Value::String(slug)),
+        ("project_pascal".into(), Value::String(pascal)),
+    ])
+}
+fn probes<R: RecipeRegistry>(r: &R) -> anyhow::Result<BTreeMap<String, String>> {
+    let mut result = BTreeMap::new();
+    for name in r.list()? {
+        for probe in r.get(&name)?.document.metadata.capability_probes {
+            match result.get(&probe.capability) {
+                Some(old) if old != &probe.program => {
+                    anyhow::bail!("conflicting probe {}", probe.capability)
+                }
+                _ => {
+                    result.insert(probe.capability, probe.program);
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+fn capabilities<R: RecipeRegistry>(r: &R) -> anyhow::Result<BTreeSet<String>> {
+    Ok(probes(r)?
+        .into_iter()
+        .filter_map(|(capability, program)| {
+            std::process::Command::new(program)
+                .arg("--version")
+                .output()
+                .is_ok()
+                .then_some(capability)
+        })
+        .collect())
+}
+fn apply_preview(
     cli: &Cli,
     root: &Path,
     preview: GenerationPreview,
     yes: bool,
-    run_commands: bool,
+    run: bool,
 ) -> anyhow::Result<()> {
-    emit_plan(cli, &preview.plan)?;
-    if !confirm(cli, &preview.plan, yes)? {
+    show_plan(cli, &preview.plan);
+    if !approve(cli, &preview.plan, yes)? {
         return Ok(());
     }
     commit(root, &preview.plan)?;
-    let commands = validation_commands(&preview.resolution);
-    if run_commands {
-        if !cli.json {
-            println!(
-                "{} running declared validation commands",
-                style("run").cyan().bold()
-            );
-        }
+    if run {
         run_safe_validation_commands(&preview.resolution, root)?;
-    } else if !commands.is_empty() && !cli.quiet && !cli.json {
-        println!("{} validation commands were not run. Re-run with --run-commands to execute the declared argv commands.", style("note:").yellow().bold());
-        for (recipe, command) in &commands {
-            println!("  {recipe}: {command}");
+    } else if !cli.quiet && !cli.json {
+        for (r, c) in validation_commands(&preview.resolution) {
+            println!("note: {r}: {c}");
         }
     }
     if cli.json {
-        emit_json(&serde_json::json!({
-            "root": root,
-            "recipes": preview.resolution.names(),
-            "plan": preview.plan,
-            "commands_run": run_commands,
-        }))?;
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"recipes":preview.resolution.names(),"plan":preview.plan})
+        );
     } else if !cli.quiet {
         println!(
             "{} generated {}",
@@ -403,262 +464,30 @@ fn execute_preview(
     }
     Ok(())
 }
-
-fn emit_plan(cli: &Cli, plan: &FilePlan) -> anyhow::Result<()> {
-    if cli.json || cli.quiet {
-        return Ok(());
+fn show_plan(cli: &Cli, plan: &FilePlan) {
+    if cli.quiet || cli.json {
+        return;
     }
-    println!("{}", style("preview").cyan().bold());
     for change in &plan.changes {
-        let label = match change.kind {
-            ChangeKind::Create => style("create").green(),
-            ChangeKind::Update => style("update").yellow(),
-            ChangeKind::Delete => style("delete").red(),
-            ChangeKind::Unchanged => style("same").dim(),
-            ChangeKind::Skip => style("skip").dim(),
+        let tag = match change.kind {
+            ChangeKind::Create => "create",
+            ChangeKind::Update => "update",
+            ChangeKind::Delete => "delete",
+            ChangeKind::Unchanged => "same",
+            ChangeKind::Skip => "skip",
         };
-        println!(
-            "  {:<8} {}  ({})",
-            label,
-            change.path.display(),
-            change.recipe
-        );
+        println!("{tag:8} {} ({})", change.path.display(), change.recipe);
     }
-    Ok(())
 }
-
-fn confirm(cli: &Cli, plan: &FilePlan, approved: bool) -> anyhow::Result<bool> {
-    if !plan.has_changes() {
-        return Ok(true);
-    }
-    if approved {
+fn approve(cli: &Cli, plan: &FilePlan, yes: bool) -> anyhow::Result<bool> {
+    if !plan.has_changes() || yes {
         return Ok(true);
     }
     if cli.json {
-        anyhow::bail!("changes require --yes in --json mode");
+        anyhow::bail!("--yes required with --json");
     }
     Ok(Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Apply this preview?")
         .default(false)
         .interact()?)
-}
-
-fn emit_json<T: Serialize>(data: &T) -> anyhow::Result<()> {
-    println!(
-        "{}",
-        serde_json::to_string(&JsonEnvelope { ok: true, data })?
-    );
-    Ok(())
-}
-
-fn status(available: bool) -> console::StyledObject<&'static str> {
-    if available {
-        style("available").green()
-    } else {
-        style("missing").red()
-    }
-}
-
-fn capabilities() -> BTreeSet<String> {
-    let mut values = BTreeSet::new();
-    if command_available("node") {
-        values.insert("node-runtime".to_owned());
-    }
-    if command_available("npm") {
-        values.insert("npm".to_owned());
-    }
-    values
-}
-
-fn command_available(program: &str) -> bool {
-    std::process::Command::new(program)
-        .arg("--version")
-        .output()
-        .is_ok()
-}
-
-#[derive(Debug, Clone)]
-struct Selection {
-    framework: String,
-    architecture: String,
-    database: String,
-    zod: bool,
-    pino: bool,
-    vitest: bool,
-    biome: bool,
-    hooks: bool,
-    github_actions: bool,
-}
-
-impl Selection {
-    fn from_args(args: &InitArgs) -> anyhow::Result<Self> {
-        let selection = Self {
-            framework: args.framework.clone(),
-            architecture: args.architecture.clone(),
-            database: args.database.clone(),
-            zod: args.zod,
-            pino: args.pino,
-            vitest: args.vitest,
-            biome: args.biome,
-            hooks: args.hooks,
-            github_actions: args.github_actions,
-        };
-        selection.validate()?;
-        Ok(selection)
-    }
-
-    fn validate(&self) -> anyhow::Result<()> {
-        for (label, value, allowed) in [
-            (
-                "framework",
-                self.framework.as_str(),
-                &["express", "hono", "none"][..],
-            ),
-            (
-                "architecture",
-                self.architecture.as_str(),
-                &["minimal", "layered", "clean"][..],
-            ),
-            ("database", self.database.as_str(), &["sqlite", "none"][..]),
-        ] {
-            if !allowed.contains(&value) {
-                anyhow::bail!(
-                    "invalid {label} `{value}`; expected one of {}",
-                    allowed.join(", ")
-                );
-            }
-        }
-        Ok(())
-    }
-
-    fn recipes(&self) -> Vec<String> {
-        let mut recipes = vec![
-            "node".to_owned(),
-            "typescript".to_owned(),
-            format!("architecture-{}", self.architecture),
-        ];
-        if self.framework != "none" {
-            recipes.push(self.framework.clone());
-        }
-        if self.database == "sqlite" {
-            recipes.extend(["sqlite-libsql".to_owned(), "drizzle".to_owned()]);
-        }
-        if self.zod || (self.architecture == "clean" && self.database == "sqlite") {
-            recipes.push("zod".to_owned());
-        }
-        if self.pino {
-            recipes.push("pino".to_owned());
-        }
-        if self.vitest {
-            recipes.push("vitest".to_owned());
-        }
-        if self.biome {
-            recipes.push("biome".to_owned());
-        }
-        if self.hooks {
-            recipes.push("husky-lint-staged".to_owned());
-        }
-        if self.github_actions {
-            recipes.push("github-actions".to_owned());
-        }
-        recipes
-    }
-
-    fn variables(&self, project_name: &str) -> BTreeMap<String, Value> {
-        let slug = project_name.replace('_', "-");
-        let pascal = slug
-            .split('-')
-            .filter(|part| !part.is_empty())
-            .map(|part| {
-                let mut chars = part.chars();
-                match chars.next() {
-                    Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                    None => String::new(),
-                }
-            })
-            .collect::<String>();
-        BTreeMap::from([
-            (
-                "project_name".to_owned(),
-                Value::String(project_name.to_owned()),
-            ),
-            ("project_slug".to_owned(), Value::String(slug)),
-            ("project_pascal".to_owned(), Value::String(pascal)),
-            (
-                "framework".to_owned(),
-                Value::String(self.framework.clone()),
-            ),
-            (
-                "architecture".to_owned(),
-                Value::String(self.architecture.clone()),
-            ),
-            ("database".to_owned(), Value::String(self.database.clone())),
-            (
-                "zod_enabled".to_owned(),
-                Value::Bool(
-                    self.zod || (self.architecture == "clean" && self.database == "sqlite"),
-                ),
-            ),
-            ("pino_enabled".to_owned(), Value::Bool(self.pino)),
-            ("vitest_enabled".to_owned(), Value::Bool(self.vitest)),
-            ("biome_enabled".to_owned(), Value::Bool(self.biome)),
-        ])
-    }
-}
-
-fn interactive_selection(args: &InitArgs) -> anyhow::Result<Selection> {
-    let theme = ColorfulTheme::default();
-    let framework = ["express", "hono", "none"][Select::with_theme(&theme)
-        .with_prompt("HTTP framework")
-        .items(&["Express", "Hono", "None"])
-        .default(0)
-        .interact()?]
-    .to_owned();
-    let architecture = ["minimal", "layered", "clean"][Select::with_theme(&theme)
-        .with_prompt("Architecture")
-        .items(&["Minimal", "Layered", "Clean"])
-        .default(0)
-        .interact()?]
-    .to_owned();
-    let database = ["none", "sqlite"][Select::with_theme(&theme)
-        .with_prompt("Database")
-        .items(&["None", "SQLite + LibSQL + Drizzle"])
-        .default(0)
-        .interact()?]
-    .to_owned();
-    let zod = Confirm::with_theme(&theme)
-        .with_prompt("Enable Zod validation?")
-        .default(args.zod)
-        .interact()?;
-    let pino = Confirm::with_theme(&theme)
-        .with_prompt("Enable Pino logging?")
-        .default(args.pino)
-        .interact()?;
-    let vitest = Confirm::with_theme(&theme)
-        .with_prompt("Enable Vitest?")
-        .default(args.vitest)
-        .interact()?;
-    let biome = Confirm::with_theme(&theme)
-        .with_prompt("Enable Biome?")
-        .default(args.biome)
-        .interact()?;
-    let hooks = Confirm::with_theme(&theme)
-        .with_prompt("Enable Husky + lint-staged?")
-        .default(args.hooks)
-        .interact()?;
-    let github_actions = Confirm::with_theme(&theme)
-        .with_prompt("Enable GitHub Actions?")
-        .default(args.github_actions)
-        .interact()?;
-    Ok(Selection {
-        framework,
-        architecture,
-        database,
-        zod,
-        pino,
-        vitest,
-        biome,
-        hooks,
-        github_actions,
-    })
 }

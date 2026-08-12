@@ -3,6 +3,8 @@ metadata:
   name: biome
   version: 0.1.0
   description: Biome linting and formatting configuration
+  activation_variables:
+    biome_enabled: true
 depends_on:
   - typescript
 compatible_with: []

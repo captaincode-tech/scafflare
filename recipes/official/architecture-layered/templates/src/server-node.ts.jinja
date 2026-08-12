@@ -1,0 +1,6 @@
+import { createServer } from "node:http";
+import { TodoController } from "./modules/todos/controller.js";
+import { InMemoryTodoRepository } from "./modules/todos/repository.js";
+import { TodoService } from "./modules/todos/service.js";
+const todos=new TodoController(new TodoService(new InMemoryTodoRepository()));
+createServer(async(req,res)=>{res.setHeader("content-type","application/json");if(req.url==="/health"){res.end(JSON.stringify({status:"ok"}));return;}if(req.url==="/todos"){res.end(JSON.stringify(await todos.list()));return;}res.statusCode=404;res.end(JSON.stringify({error:"not found"}));}).listen(Number(process.env.PORT??3000));

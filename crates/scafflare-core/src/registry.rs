@@ -21,7 +21,7 @@ pub trait RecipeRegistry {
     fn source(&self) -> RegistrySource;
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct BundledRegistry;
 
 impl BundledRegistry {
@@ -119,6 +119,50 @@ impl RecipeRegistry for FilesystemRegistry {
 
     fn source(&self) -> RegistrySource {
         RegistrySource::Filesystem
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CompositeRegistry {
+    local: Vec<FilesystemRegistry>,
+    bundled: BundledRegistry,
+}
+
+impl CompositeRegistry {
+    pub fn new(roots: Vec<PathBuf>) -> Self {
+        Self {
+            local: roots.into_iter().map(FilesystemRegistry::new).collect(),
+            bundled: BundledRegistry::new(),
+        }
+    }
+}
+
+impl RecipeRegistry for CompositeRegistry {
+    fn list(&self) -> Result<Vec<String>> {
+        let mut names = self.bundled.list()?;
+        for registry in &self.local {
+            names.extend(registry.list()?);
+        }
+        names.sort();
+        names.dedup();
+        Ok(names)
+    }
+
+    fn get(&self, name: &str) -> Result<LoadedRecipe> {
+        for registry in &self.local {
+            if let Ok(recipe) = registry.get(name) {
+                return Ok(recipe);
+            }
+        }
+        self.bundled.get(name)
+    }
+
+    fn source(&self) -> RegistrySource {
+        if self.local.is_empty() {
+            RegistrySource::Bundled
+        } else {
+            RegistrySource::Filesystem
+        }
     }
 }
 
