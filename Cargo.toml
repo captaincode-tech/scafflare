@@ -22,7 +22,7 @@ anyhow = "1.0"
 assert_cmd = "2.0"
 clap = { version = "4.5", features = ["derive", "color"] }
 console = "0.15"
-dialoguer = "0.11"
+dialoguer = "0.12"
 dirs = "5.0"
 include_dir = "0.7"
 minijinja = { version = "2.1", features = ["builtins"] }
