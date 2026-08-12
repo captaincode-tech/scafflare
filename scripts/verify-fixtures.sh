@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CARGO_BIN="${CARGO_BIN:-$HOME/.cargo/bin/cargo}"
+CARGO_BIN="${CARGO_BIN:-$(command -v cargo || true)}"
 WORKDIR="${SCAFFLARE_FIXTURE_WORKDIR:-$(mktemp -d)}"
 KEEP_FIXTURES="${KEEP_FIXTURES:-false}"
 

@@ -1,12 +1,23 @@
 # Scafflare
 
-**Scafflare** یک CLI سریع و standalone در Rust برای ساخت backendهای Node.js/TypeScript با Recipeهای YAML ترکیب‌پذیر است. هسته نسبت به زبان و framework بی‌طرف است: Express، Hono، Drizzle و ابزارهای کیفیت صرفاً Recipe هستند، نه وابستگی‌های hard-coded هسته.
+[![CI](https://github.com/captaincode-tech/scafflare/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/captaincode-tech/scafflare/actions/workflows/ci.yml)
+[![Release](https://github.com/captaincode-tech/scafflare/actions/workflows/release.yml/badge.svg)](https://github.com/captaincode-tech/scafflare/actions/workflows/release.yml)
+[![Rust 1.75+](https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust)](https://www.rust-lang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> امنیت پیش‌فرض: Recipeها داده هستند. Scafflare هیچ command خارجی را خودکار اجرا نمی‌کند؛ اجرای validation commandهای اعلام‌شده فقط با `--run-commands` ممکن است.
+**English** | [فارسی](README.fa.md)
 
-## نصب
+**Scafflare** is a fast, standalone Rust CLI for generating Node.js/TypeScript backends from composable YAML recipes. Its core is language- and framework-neutral: Express, Hono, Drizzle, and quality tooling are recipes rather than hard-coded core dependencies.
 
-برای ساخت از source به Rust Stable نیاز دارید:
+> **Secure by default:** recipes are data. Scafflare never executes external commands automatically; declared validation commands can run only when the user explicitly supplies `--run-commands`.
+
+![Scafflare init → build → health-check demo](docs/assets/scafflare-demo.gif)
+
+## Installation
+
+### Build from source
+
+Building from source requires Rust Stable 1.75 or later.
 
 ```bash
 git clone https://github.com/captaincode-tech/scafflare.git
@@ -15,11 +26,13 @@ cargo build --release
 ./target/release/scafflare --help
 ```
 
-Binary تولیدشده در `target/release/scafflare` روی Linux، macOS و Windows قابل انتشار است. در Windows نام فایل `scafflare.exe` خواهد بود.
+### Release binaries
 
-## شروع سریع
+Versioned Linux, macOS, and Windows archives will be attached to GitHub Releases after a maintainer pushes a verified version tag such as `v0.1.0`. Each archive is accompanied by the `SHA256SUMS` checksum manifest. No release has been published yet.
 
-نمونهٔ کامل Express + Clean Architecture + SQLite/LibSQL + Drizzle را ایجاد کنید:
+## Quick start
+
+Generate a complete Express backend with Clean Architecture, SQLite/LibSQL, and Drizzle:
 
 ```bash
 scafflare init todo-api \
@@ -44,40 +57,38 @@ npm run build
 npm run dev
 ```
 
-برای wizard تعاملی، فقط `scafflare init todo-api` را اجرا کنید. قبل از هر تغییر، preview فایل‌ها نمایش داده می‌شود. برای automation باید `--yes` را صریحاً وارد کنید.
+For the interactive wizard, run `scafflare init todo-api`. Scafflare displays a file preview before making changes. Automation must explicitly opt in with `--yes`.
 
-![Scafflare init → build → health-check demo](docs/assets/scafflare-demo.gif)
+## Commands
 
-## دستورات
-
-| دستور | کاربرد |
+| Command | Purpose |
 |---|---|
-| `scafflare init <project-name>` | ایجاد پروژه با wizard یا flagهای non-interactive |
-| `scafflare add <recipe...>` | افزودن Recipe به پروژهٔ مدیریت‌شده |
-| `scafflare remove <recipe>` | حذف ایمن Recipe و فایل‌های exclusively-owned و بدون تغییر کاربر |
-| `scafflare list` | نمایش Recipeهای bundle شده |
-| `scafflare doctor` | بررسی Node/npm و lockfile پروژه |
-| `scafflare validate` | بررسی lockfile و نسخهٔ Recipeهای نصب‌شده |
-| `scafflare recipe validate <path>` | اعتبارسنجی recipe.yaml و templateهای مرجع |
+| `scafflare init <project-name>` | Create a project with the wizard or non-interactive flags. |
+| `scafflare add <recipe...>` | Add recipes to a managed project. |
+| `scafflare remove <recipe>` | Safely remove a recipe and exclusively owned, unmodified files. |
+| `scafflare list` | List bundled recipes. |
+| `scafflare doctor` | Check Node.js, npm, and the project lockfile. |
+| `scafflare validate` | Validate the lockfile and versions of installed recipes. |
+| `scafflare recipe validate <path>` | Validate a `recipe.yaml` and its referenced templates. |
 
-گزینه‌های global `--json` و `--quiet` برای CI و automation موجود هستند. خروجی `--json` فقط به stdout نوشته می‌شود. `--run-commands` commandهای validation در فرم آرایه‌ای YAML را بعد از commit اجرا می‌کند؛ commandهای shell-like هرگز اجرا نمی‌شوند.
+Global `--json` and `--quiet` options support CI and automation. `--json` writes only machine-readable output to stdout. `--run-commands` runs array-form YAML validation commands after a successful commit; shell-like string commands are never executed.
 
-## Recipeهای رسمی 0.1
+## Official recipes for 0.1
 
-| دسته | Recipeها |
+| Category | Recipes |
 |---|---|
-| Runtime و زبان | `node`، `typescript` |
-| HTTP | `express`، `hono` |
-| معماری | `architecture-minimal`، `architecture-layered`، `architecture-clean` |
-| Data | `sqlite-libsql`، `drizzle` |
-| قابلیت‌ها | `zod`، `pino` |
-| کیفیت | `vitest`، `biome`، `husky-lint-staged`، `github-actions` |
+| Runtime and language | `node`, `typescript` |
+| HTTP | `express`, `hono` |
+| Architecture | `architecture-minimal`, `architecture-layered`, `architecture-clean` |
+| Data | `sqlite-libsql`, `drizzle` |
+| Features | `zod`, `pino` |
+| Quality | `vitest`, `biome`, `husky-lint-staged`, `github-actions` |
 
-انتخاب **Clean + SQLite** به‌صورت خودکار `zod` را اضافه می‌کند و Todo CRUD واقعی در مسیر `Route → Controller → Service → Repository Interface → Drizzle Repository → Database` تولید می‌شود.
+Selecting **Clean + SQLite** automatically adds `zod` and generates a working Todo CRUD flow through `Route → Controller → Service → Repository Interface → Drizzle Repository → Database`.
 
-## ساخت Recipe جدید
+## Authoring a recipe
 
-هر Recipe یک پوشه با `recipe.yaml` و templateهای زیر `templates/` است:
+A recipe is a directory containing `recipe.yaml` and templates under `templates/`:
 
 ```text
 recipes/custom/example/
@@ -107,31 +118,41 @@ post_generation_instructions:
   - Review the generated example module.
 ```
 
-مسیرهای `source` و `destination` باید relative و فاقد `..`، مسیر absolute یا prefix ویندوز باشند. Strategyهای پشتیبانی‌شده `create`، `replace`، `merge_json`، `skip` و `fail` هستند. `merge_json` همیشه merge ساختاریافته انجام می‌دهد و string injection در `package.json` یا `tsconfig.json` ندارد.
+`source` and `destination` paths must be relative and must not contain `..`, absolute paths, or Windows path prefixes. Supported strategies are `create`, `replace`, `merge_json`, `skip`, and `fail`. `merge_json` always performs a structured merge and never uses string injection in `package.json` or `tsconfig.json`.
 
-برای آزمایش یک Recipe محلی:
+Validate a local recipe with:
 
 ```bash
 scafflare recipe validate recipes/custom/example/recipe.yaml
 ```
 
-جزئیات چرخهٔ generation، lockfile و مدل امنیتی در [معماری](docs/architecture.md) آمده است.
+Read the [architecture guide](docs/architecture.md) and [recipe-authoring guide](docs/recipe-authoring.md) for the generation lifecycle, lockfile, and recipe contract.
 
-## توسعه و quality gates
+## Development and quality gates
 
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo build --release
+cargo build --workspace --release
+scripts/verify-fixtures.sh
+cargo audit
 ```
 
-CI پروژه همین گیت‌ها را روی Linux، macOS و Windows اجرا و binaryهای release را artifact می‌کند. گزارش اجرای واقعی fixtureها و CRUD در [گزارش اعتبارسنجی](docs/validation-report.md) ثبت شده است.
+CI runs the Rust gates and release build on Linux, macOS, and Windows. It also validates every official recipe and generates six supported Node.js/TypeScript fixtures; each fixture is installed, audited with `npm audit --omit=dev`, type-checked, linted, tested, and built. See the current [validation report](docs/validation-report.md).
 
-## وضعیت MVP و محدودیت‌ها
+## Security
 
-Registry آنلاین، signature verification، pluginهای native، Laravel/Python/Go، Prisma و Docker عمداً خارج از scope نسخهٔ `0.1.0` هستند. registry abstraction و Recipeهای bundle شده، مبنای توسعهٔ بعدی را فراهم کرده‌اند. حذف Recipe وابستگی‌های package manager را از manifest پاک‌سازی نمی‌کند؛ این محدودیت برای جلوگیری از حذف ناامن dependencyهای اشتراکی در بخش Roadmap ثبت شده است.
+See [SECURITY.md](SECURITY.md) for reporting guidance and the recipe threat model. In short, Scafflare rejects absolute paths, `..`, Windows prefixes, and paths outside the project sandbox. External commands are shown but not run unless the user explicitly opts in with `--run-commands`; shell-form commands are not executable. The MVP deliberately excludes an online registry and script hooks.
 
-## مجوز
+## MVP scope and limitations
 
-Scafflare تحت [MIT License](LICENSE) منتشر می‌شود.
+Online registries, signature verification, native plugins, Laravel/Python/Go recipes, Prisma, and Docker are intentionally outside the `0.1.0` scope. The registry abstraction and bundled recipes provide the basis for later development. Recipe removal intentionally does not remove package-manager dependencies from manifests, which prevents unsafe removal of shared dependencies.
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md), follow the [Code of Conduct](CODE_OF_CONDUCT.md), and review the [changelog](CHANGELOG.md) before opening a pull request. For security issues, use the private reporting process in [SECURITY.md](SECURITY.md), not a public issue.
+
+## License
+
+Scafflare is released under the [MIT License](LICENSE).

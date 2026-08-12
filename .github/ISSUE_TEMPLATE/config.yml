@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability reporting
+    url: https://github.com/captaincode-tech/scafflare/security/advisories/new
+    about: Do not open public issues for security vulnerabilities; follow SECURITY.md.
+  - name: Security policy
+    url: https://github.com/captaincode-tech/scafflare/blob/main/SECURITY.md
+    about: Read the reporting process and supported-version policy.

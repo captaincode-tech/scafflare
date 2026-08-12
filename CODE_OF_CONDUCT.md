@@ -1,5 +1,7 @@
 # Code of Conduct
 
-Scafflare متعهد به محیطی حرفه‌ای، محترمانه و فراگیر برای همهٔ مشارکت‌کنندگان است. رفتارهایی مانند آزار، تبعیض، تهدید، توهین شخصی، انتشار اطلاعات خصوصی یا اخلال عمدی در گفت‌وگوها پذیرفته نیست.
+Scafflare is committed to a professional, respectful, and inclusive environment for every contributor. Harassment, discrimination, threats, personal attacks, publication of private information, or deliberate disruption of discussion are not acceptable.
 
-نگه‌دارندگان می‌توانند برای حفظ این استانداردها محتوا را ویرایش یا حذف کنند، گفتگو را متوقف کنند، یا دسترسی مشارکت‌کنندگان ناقض را محدود کنند. گزارش رفتار نامناسب باید به‌صورت private برای نگه‌دارندگان repository ارسال شود و با حفظ محرمانگی بررسی خواهد شد.
+Maintainers may edit or remove content, end a discussion, or limit the access of participants who violate these standards. Report conduct concerns privately through the repository maintainers; reports will be reviewed confidentially and handled proportionately.
+
+Security vulnerabilities are not conduct reports and must follow the private disclosure process in [SECURITY.md](SECURITY.md).

@@ -1,0 +1,6 @@
+# Default owner for all files in this repository.
+* @captaincode-tech
+
+# Changes to automation and security require owner review.
+/.github/ @captaincode-tech
+/SECURITY.md @captaincode-tech

@@ -5,18 +5,20 @@ title: "bug: "
 labels: bug
 ---
 
-## نسخه و محیط
+> Do not report security vulnerabilities here. Use the private process in [SECURITY.md](../../SECURITY.md).
 
-خروجی `scafflare --version`، سیستم‌عامل و معماری CPU را وارد کنید.
+## Version and environment
 
-## دستور اجراشده
+Provide the output of `scafflare --version`, operating system, CPU architecture, Node.js/npm versions where relevant, and the recipe versions involved.
 
-دستور کامل Scafflare، flagها و نام Recipeها را وارد کنید. اطلاعات محرمانه را حذف کنید.
+## Command and configuration
 
-## رفتار مورد انتظار و واقعی
+Provide the complete Scafflare command, flags, and relevant `recipe.yaml` content. Remove credentials and private data.
 
-تفاوت میان نتیجهٔ مورد انتظار و خروجی واقعی را توضیح دهید.
+## Expected and actual behavior
 
-## مراحل بازتولید
+Describe the expected result and the actual output or error.
 
-حداقل مراحل لازم، recipe.yaml مرتبط و خروجی خطا را وارد کنید.
+## Minimal reproduction steps
+
+List the smallest sequence of steps needed to reproduce the behavior, including any generated project commands and logs.

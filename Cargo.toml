@@ -10,8 +10,12 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
-authors = ["Scafflare Contributors"]
+authors = ["Captain Code"]
 repository = "https://github.com/captaincode-tech/scafflare"
+homepage = "https://github.com/captaincode-tech/scafflare"
+readme = "README.md"
+keywords = ["scaffolding", "cli", "code-generation", "templates", "recipes"]
+categories = ["command-line-utilities", "development-tools", "template-engine"]
 
 [workspace.dependencies]
 anyhow = "1.0"

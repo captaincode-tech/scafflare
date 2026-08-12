@@ -9,9 +9,10 @@ BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
 
 FRAMES = [
     [
-        ("$ scafflare init todo-api --non-interactive \\", "command"),
-        ("    --framework express --architecture clean \\", "command"),
-        ("    --database sqlite --vitest --biome --yes", "command"),
+        ("$ scafflare init todo-api --non-interactive", "command"),
+        ("  ↳ --set framework=express --set architecture=clean", "command"),
+        ("  ↳ --set database=sqlite --set vitest_enabled=true", "command"),
+        ("  ↳ --set biome_enabled=true --yes", "command"),
         ("", "plain"),
         ("preview", "accent"),
         ("  create   package.json                 (zod)", "success"),
@@ -34,9 +35,9 @@ FRAMES = [
         ("$ curl http://localhost:3000/health", "command"),
         ('{"status":"ok"}', "success"),
         ("", "plain"),
-        ("$ curl -X POST http://localhost:3000/todos \\", "command"),
-        ("    -H 'content-type: application/json' \\", "command"),
-        ("    -d '{\"title\":\"Ship Scafflare\"}'", "command"),
+        ("$ curl -X POST http://localhost:3000/todos", "command"),
+        ("  ↳ -H 'content-type: application/json'", "command"),
+        ("  ↳ -d '{\"title\":\"Ship Scafflare\"}'", "command"),
         ('{"id":1,"title":"Ship Scafflare","completed":false}', "success"),
         ("", "plain"),
         ("Fast, composable, production-minded backends.", "accent"),
@@ -61,7 +62,7 @@ def make_frame(lines):
     title_font = ImageFont.truetype(BOLD, 28)
     body_font = ImageFont.truetype(FONT, 22)
     draw.rounded_rectangle((35, 35, WIDTH - 35, HEIGHT - 35), radius=18, fill=COLORS["panel"], outline=COLORS["border"], width=2)
-    draw.text((72, 72), "STACKFORGE  •  composable backend scaffolding", font=title_font, fill=COLORS["accent"])
+    draw.text((72, 72), "SCAFFLARE  •  composable backend scaffolding", font=title_font, fill=COLORS["accent"])
     draw.text((72, 115), "terminal demo", font=body_font, fill=COLORS["muted"])
     y = 170
     for line, kind in lines:

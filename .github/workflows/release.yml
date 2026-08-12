@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify release inputs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+
+      - name: Confirm tag matches workspace version
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          expected_tag="v$(awk -F '"' '/^version = / { print $2; exit }' Cargo.toml)"
+          test "$GITHUB_REF_NAME" = "$expected_tag"
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Release build
+        run: cargo build --workspace --release
+
+      - name: Validate official recipes
+        shell: bash
+        run: |
+          for recipe in recipes/official/*; do
+            cargo run --locked -q -p scafflare -- recipe validate "$recipe/recipe.yaml" --quiet
+          done
+
+      - name: Validate generated fixtures
+        shell: bash
+        run: scripts/verify-fixtures.sh
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit Rust dependencies
+        run: cargo audit
+
+  build:
+    name: Build ${{ matrix.asset_name }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            asset_name: scafflare-x86_64-unknown-linux-gnu
+            binary_name: scafflare
+            archive_name: scafflare-x86_64-unknown-linux-gnu.tar.gz
+            archive_format: tar.gz
+          - runner: macos-13
+            asset_name: scafflare-x86_64-apple-darwin
+            binary_name: scafflare
+            archive_name: scafflare-x86_64-apple-darwin.tar.gz
+            archive_format: tar.gz
+          - runner: macos-14
+            asset_name: scafflare-aarch64-apple-darwin
+            binary_name: scafflare
+            archive_name: scafflare-aarch64-apple-darwin.tar.gz
+            archive_format: tar.gz
+          - runner: windows-latest
+            asset_name: scafflare-x86_64-pc-windows-msvc
+            binary_name: scafflare.exe
+            archive_name: scafflare-x86_64-pc-windows-msvc.zip
+            archive_format: zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --locked --release -p scafflare
+
+      - name: Package archive
+        if: matrix.archive_format == 'tar.gz'
+        shell: bash
+        run: |
+          mkdir -p dist
+          tar -czf "dist/${{ matrix.archive_name }}" -C target/release "${{ matrix.binary_name }}"
+
+      - name: Package archive
+        if: matrix.archive_format == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "target/release/${{ matrix.binary_name }}" -DestinationPath "dist/${{ matrix.archive_name }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.archive_name }}
+          if-no-files-found: error
+
+  publish:
+    name: Create GitHub Release
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          mkdir dist
+          find release-assets -type f -exec cp {} dist/ \;
+          cd dist
+          sha256sum --binary ./*.tar.gz ./*.zip > SHA256SUMS.txt
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*.tar.gz dist/*.zip dist/SHA256SUMS.txt

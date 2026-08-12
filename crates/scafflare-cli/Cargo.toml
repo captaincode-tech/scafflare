@@ -4,6 +4,14 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "A composable YAML-recipe CLI for generating Node.js and TypeScript backends"
+publish = false
 
 [[bin]]
 name = "scafflare"
@@ -17,4 +25,4 @@ dialoguer.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-scafflare-core = { path = "../scafflare-core" }
+scafflare-core = { path = "../scafflare-core", version = "0.1.0" }

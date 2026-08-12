@@ -1,17 +1,22 @@
-## خلاصه
+## Summary
 
-تغییر و انگیزهٔ آن را به‌صورت کوتاه توضیح دهید.
+Briefly describe the change and its motivation. Link related issues when applicable.
 
-## اعتبارسنجی
+## Validation
 
 - [ ] `cargo fmt --all -- --check`
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings`
 - [ ] `cargo test --workspace`
-- [ ] در صورت تغییر Recipe، `scafflare recipe validate` اجرا شده است.
-- [ ] در صورت تغییر template Node.js، fixture مرتبط install، typecheck، lint، test و build شده است.
+- [ ] `cargo build --workspace --release`
+- [ ] If a recipe changed, `scafflare recipe validate` was run.
+- [ ] If a Node.js template changed, every affected fixture was installed, audited with `npm audit --omit=dev`, type-checked, linted, tested, and built.
+- [ ] If bundled recipes or generated Node.js behavior changed, `scripts/verify-fixtures.sh` was run.
 
-## امنیت و سازگاری
+## Security and compatibility
 
-- [ ] مسیرهای جدید با sandbox path validator سازگار هستند.
-- [ ] تغییر command خارجی بدون اجرای خودکار و با opt-in باقی مانده است.
-- [ ] تغییر breaking در CHANGELOG ثبت شده است.
+- [ ] New paths comply with the sandbox path validator.
+- [ ] External commands remain opt-in and are not added in shell-string form.
+- [ ] Breaking or user-visible changes are documented in `CHANGELOG.md`.
+- [ ] No secrets, generated build output, or unrelated files are included.
+
+> Do not disclose security vulnerabilities in a pull request. Follow [SECURITY.md](../SECURITY.md).
