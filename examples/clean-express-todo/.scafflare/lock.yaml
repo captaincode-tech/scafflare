@@ -1,38 +1,40 @@
 lockfile_version: 1
 project_name: scafflare-generated-clean
 recipes:
-- name: node
-  version: 0.1.0
 - name: typescript
+  version: 0.1.0
+- name: zod
   version: 0.1.0
 - name: architecture-clean
   version: 0.1.0
-- name: express
+- name: biome
   version: 0.1.0
 - name: sqlite-libsql
   version: 0.1.0
 - name: drizzle
   version: 0.1.0
-- name: zod
+- name: express
   version: 0.1.0
-- name: pino
-  version: 0.1.0
-- name: vitest
-  version: 0.1.0
-- name: biome
+- name: github-actions
   version: 0.1.0
 - name: husky-lint-staged
   version: 0.1.0
-- name: github-actions
+- name: node
+  version: 0.2.0
+- name: pino
+  version: 0.1.0
+- name: vitest
   version: 0.1.0
 variables:
   architecture: clean
   biome_enabled: true
   database: sqlite
   framework: express
+  github_actions_enabled: true
+  hooks_enabled: true
   pino_enabled: true
   project_name: scafflare-generated-clean
-  project_pascal: StackforgeGeneratedClean
+  project_pascal: ScafflareGeneratedClean
   project_slug: scafflare-generated-clean
   vitest_enabled: true
   zod_enabled: true
@@ -56,11 +58,11 @@ managed_files:
   README.md:
     recipes:
     - architecture-clean
-    sha256: d9d15598e40407c3801b9e5522312e93d6de0c9b05be6df921880e487f1f2de8
+    sha256: b01760641b576de541dcc3bdc553799ca020914d88c2871e7895405cb9b418dd
   biome.json:
     recipes:
     - biome
-    sha256: 6c1095628e0f6878dc2731f5dea1bcaf75b6730b76c10d83563d403d2c7e64c0
+    sha256: d39bd0ef198722cd6b220d9ff5e503c9e57c05ef7b97a4dbf316726e2d32c847
   drizzle.config.ts:
     recipes:
     - drizzle
@@ -76,7 +78,7 @@ managed_files:
     - sqlite-libsql
     - vitest
     - zod
-    sha256: 7742c1ff2d611e489c55dad64cb45738a23c872ed1fd9fef9d2eab7235a2110a
+    sha256: 8c4587d57097db555f7cf3527193834937f8a99bef41a28fd8034cb9025b5e86
   src/config/env.ts:
     recipes:
     - typescript
@@ -96,7 +98,7 @@ managed_files:
   src/logger.ts:
     recipes:
     - pino
-    sha256: 47e44b25751191568c3c3f9c250b3a954966ba7147030970792a2ecfcc62f980
+    sha256: b1f7c762cc7e445bf090922310bbd6683fc322c878eae05adeb900b0a7a0236f
   src/modules/todos/controller.ts:
     recipes:
     - architecture-clean
@@ -120,7 +122,7 @@ managed_files:
   src/server.ts:
     recipes:
     - express
-    sha256: 42d6cbb1c7ba73106044c3cb14d09df0171fd40cac8f75204511bf315d252bfd
+    sha256: 0701012420aca0812c36c760c70081a2f492106e66024eb30bd697b02db11f45
   test/integration/health.test.ts:
     recipes:
     - vitest
@@ -128,7 +130,7 @@ managed_files:
   test/unit/todo-service.test.ts:
     recipes:
     - vitest
-    sha256: 38eb6c995eb6ad54433da194a44b7c6de63e5c1819b5057e67680af4c4ac3303
+    sha256: 50697121ecba58872f54b6c2e9cbd10c917a9de1986c9473963834090672a06a
   tsconfig.build.json:
     recipes:
     - typescript

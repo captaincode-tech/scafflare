@@ -11,7 +11,7 @@ edition = "2021"
 rust-version = "1.75"
 license = "MIT"
 authors = ["Scafflare Contributors"]
-repository = "https://github.com/scafflare/scafflare"
+repository = "https://github.com/captaincode-tech/scafflare"
 
 [workspace.dependencies]
 anyhow = "1.0"

@@ -443,6 +443,84 @@ mod integration_tests {
     }
 
     #[test]
+    fn add_cross_cutting_recipe_rerenders_unchanged_managed_files_and_is_idempotent() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("safe-add");
+        let registry = BundledRegistry::new();
+        let initial = preview_init(&root, &registry, minimal_request("safe-add")).unwrap();
+        commit(&root, &initial.plan).unwrap();
+
+        let added = preview_add(
+            &root,
+            &registry,
+            vec!["pino".to_owned()],
+            BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
+        )
+        .unwrap();
+        assert!(added.plan.changes.iter().any(|change| {
+            change.path == Path::new("package.json") && change.kind == ChangeKind::Update
+        }));
+        assert!(added.plan.changes.iter().any(|change| {
+            change.path == Path::new("src/logger.ts") && change.kind == ChangeKind::Create
+        }));
+        commit(&root, &added.plan).unwrap();
+
+        let repeated = preview_add(
+            &root,
+            &registry,
+            vec!["pino".to_owned()],
+            BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
+        )
+        .unwrap();
+        assert!(!repeated.plan.has_changes());
+    }
+
+    #[test]
+    fn add_refuses_user_modified_managed_file() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("protected-add");
+        let registry = BundledRegistry::new();
+        let initial = preview_init(&root, &registry, minimal_request("protected-add")).unwrap();
+        commit(&root, &initial.plan).unwrap();
+        fs::write(root.join("package.json"), "{\"user\": true}\n").unwrap();
+
+        let result = preview_add(
+            &root,
+            &registry,
+            vec!["pino".to_owned()],
+            BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
+        );
+        assert!(matches!(result, Err(ScafflareError::FileConflict { .. })));
+        assert_eq!(
+            fs::read_to_string(root.join("package.json")).unwrap(),
+            "{\"user\": true}\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn transaction_rejects_symlink_path_escape() {
+        use std::os::unix::fs::symlink;
+
+        let temporary = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let root = temporary.path();
+        symlink(outside.path(), root.join("src")).unwrap();
+        let plan = FilePlan {
+            changes: vec![PlannedChange {
+                kind: ChangeKind::Create,
+                path: PathBuf::from("src/escaped.ts"),
+                recipe: "test".to_owned(),
+                contents: Some(b"export {};\n".to_vec()),
+            }],
+        };
+
+        let result = commit(root, &plan);
+        assert!(matches!(result, Err(ScafflareError::Transaction { .. })));
+        assert!(!outside.path().join("escaped.ts").exists());
+    }
+
+    #[test]
     fn resolver_rejects_official_framework_conflict() {
         let registry = BundledRegistry::new();
         let result = Resolver::new(&registry, BTreeSet::from(["node_runtime".to_owned()]))

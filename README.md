@@ -9,7 +9,7 @@
 برای ساخت از source به Rust Stable نیاز دارید:
 
 ```bash
-git clone https://github.com/scafflare/scafflare.git
+git clone https://github.com/captaincode-tech/scafflare.git
 cd scafflare
 cargo build --release
 ./target/release/scafflare --help
@@ -24,10 +24,14 @@ Binary تولیدشده در `target/release/scafflare` روی Linux، macOS و 
 ```bash
 scafflare init todo-api \
   --non-interactive \
-  --framework express \
-  --architecture clean \
-  --database sqlite \
-  --pino --vitest --biome --hooks --github-actions \
+  --set framework=express \
+  --set architecture=clean \
+  --set database=sqlite \
+  --set pino_enabled=true \
+  --set vitest_enabled=true \
+  --set biome_enabled=true \
+  --set hooks_enabled=true \
+  --set github_actions_enabled=true \
   --yes
 
 cd todo-api
