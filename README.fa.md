@@ -1,5 +1,7 @@
 # Scafflare
 
+[![Telegram Channel](https://img.shields.io/badge/کانال_تلگرام-Telegram-2CA5E0?logo=telegram&logoColor=white)](https://t.me/captaincode_tech)
+
 [English](README.md) | **فارسی**
 
 **Scafflare** یک CLI سریع و standalone در Rust برای ساخت backendهای Node.js/TypeScript با Recipeهای YAML ترکیب‌پذیر است. هسته نسبت به زبان و framework بی‌طرف است: Express، Hono، Drizzle و ابزارهای کیفیت صرفاً Recipe هستند، نه وابستگی‌های hard-coded هسته.

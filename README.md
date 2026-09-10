@@ -4,6 +4,7 @@
 [![Release](https://github.com/captaincode-tech/scafflare/actions/workflows/release.yml/badge.svg)](https://github.com/captaincode-tech/scafflare/actions/workflows/release.yml)
 [![Rust 1.75+](https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Telegram Channel](https://img.shields.io/badge/Telegram-Channel-2CA5E0?logo=telegram&logoColor=white)](https://t.me/captaincode_tech)
 
 **English** | [فارسی](README.fa.md)
 
