@@ -22,7 +22,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.13.0
+          node-version: 22
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - name: Confirm tag matches workspace version
         if: github.event_name == 'push'

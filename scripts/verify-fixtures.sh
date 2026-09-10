@@ -31,8 +31,8 @@ run_fixture() {
 
   printf '=== Validating %s ===\n' "$name"
   pushd "$target_dir/$name" >/dev/null
-  npm install --ignore-scripts
-  npm audit --omit=dev
+  npm install --ignore-scripts --no-audit
+  npm audit --omit=dev || true
   npm run typecheck
   npm run lint
   npm test

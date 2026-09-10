@@ -58,7 +58,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.13.0
+          node-version: 22
+      - name: Update npm
+        run: npm install -g npm@latest
       - name: Generate, install, audit, typecheck, lint, test, and build fixtures
         shell: bash
         run: scripts/verify-fixtures.sh
