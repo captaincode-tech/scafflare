@@ -90,6 +90,7 @@ jobs:
             archive_format: tar.gz
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
+            asset_name: scafflare-x86_64-pc-windows-msvc
             binary_name: scafflare.exe
             archive_name: scafflare-x86_64-pc-windows-msvc.zip
             archive_format: zip
