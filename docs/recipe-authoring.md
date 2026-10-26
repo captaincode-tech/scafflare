@@ -49,3 +49,14 @@ scafflare init fixture --non-interactive --framework hono --architecture layered
 ```
 
 Recipe جدید باید validation موفق، generation بدون conflict ناخواسته، اجرای مجدد idempotent و در صورت ساخت پروژهٔ Node.js، install/typecheck/lint/test/build معتبر داشته باشد.
+
+## نسخه‌گذاری و ارتقا
+
+`scafflare upgrade` بر پایهٔ `metadata.version` کار می‌کند: هر تغییر محتوا در Recipe (recipe.yaml یا templateها) باید با افزایش نسخهٔ semver همراه باشد، وگرنه پروژه‌های موجود تغییر را دریافت نمی‌کنند. برای Recipeهای رسمی، تست `recipe_checksums` بدون bump نسخه شکست می‌خورد.
+
+- Recipe نباید نسخه‌اش را کاهش دهد؛ downgrade رد می‌شود.
+- اضافه‌کردن فایل جدید امن است. حذف فایل از template باعث حذف فایلِ بدون تغییر کاربر و رهاسازی (orphan) فایل تغییرداده‌شده می‌شود.
+- متغیرهای جدید باید مقدار پیش‌فرض در `variables` داشته باشند، چون `upgrade` promptی نمی‌پرسد (فقط `--set`).
+- برای فایل‌هایی که کاربر معمولاً ویرایش می‌کند (مثل `package.json`) از `merge_json` استفاده کنید تا ارتقا کلید‌به‌کلید merge شود. آرایه‌ها در merge اتمی هستند.
+- فایل‌های متنی با `create` به‌صورت خطی (diff3) merge می‌شوند؛ تغییر همزمان یک خط توسط کاربر و template conflict می‌سازد.
+

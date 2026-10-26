@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use scafflare_core::plan::{ChangeKind, FilePlan};
@@ -10,8 +10,9 @@ use scafflare_core::recipe::{evaluate_condition, Prompt, PromptKind, RecipeDocum
 use scafflare_core::registry::{CompositeRegistry, RecipeRegistry};
 use scafflare_core::state::load_state;
 use scafflare_core::{
-    commit, preview_add, preview_init, preview_remove, run_safe_validation_commands,
-    validation_commands, GenerationPreview, GenerationRequest,
+    commit, preview_add_with, preview_init, preview_remove, preview_upgrade, project_status,
+    run_safe_validation_commands, validation_commands, Conflict, ConflictMode, FileState,
+    GenerationPreview, GenerationRequest, RecipeState, UpgradeOptions,
 };
 use serde_json::Value;
 
@@ -36,6 +37,10 @@ enum Commands {
     Init(InitArgs),
     Add(ModifyArgs),
     Remove(RemoveArgs),
+    /// Bring installed recipes to the bundled versions with a three-way merge.
+    Upgrade(UpgradeArgs),
+    /// Show outdated recipes, modified files, and unresolved conflicts.
+    Status(StatusArgs),
     List,
     Doctor(PathArgs),
     Validate(PathArgs),
@@ -64,6 +69,52 @@ struct InitArgs {
     #[arg(long)]
     run_commands: bool,
 }
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ConflictsArg {
+    /// Write nothing and report every conflict (default).
+    Abort,
+    /// Write git-style markers, or `<file>.scafflare-new` for JSON and unmanaged files.
+    Markers,
+}
+
+impl From<ConflictsArg> for ConflictMode {
+    fn from(value: ConflictsArg) -> Self {
+        match value {
+            ConflictsArg::Abort => ConflictMode::Abort,
+            ConflictsArg::Markers => ConflictMode::Markers,
+        }
+    }
+}
+
+#[derive(Debug, Args)]
+struct UpgradeArgs {
+    #[arg(long, default_value = ".")]
+    directory: PathBuf,
+    /// Show what would change without writing anything.
+    #[arg(long)]
+    dry_run: bool,
+    /// Print a unified diff of every file that would be written.
+    #[arg(long)]
+    diff: bool,
+    #[arg(long, short = 'y')]
+    yes: bool,
+    #[arg(long, value_enum, default_value_t = ConflictsArg::Abort)]
+    conflicts: ConflictsArg,
+    #[arg(long = "set", value_name = "KEY=VALUE")]
+    set: Vec<String>,
+    #[arg(long)]
+    run_commands: bool,
+}
+
+#[derive(Debug, Args)]
+struct StatusArgs {
+    #[arg(long, default_value = ".")]
+    directory: PathBuf,
+    /// Exit with status 2 when the project needs attention.
+    #[arg(long)]
+    exit_code: bool,
+}
+
 #[derive(Debug, Args)]
 struct ModifyArgs {
     #[arg(required=true, num_args=1..)]
@@ -74,6 +125,8 @@ struct ModifyArgs {
     yes: bool,
     #[arg(long)]
     run_commands: bool,
+    #[arg(long, value_enum, default_value_t = ConflictsArg::Abort)]
+    conflicts: ConflictsArg,
 }
 #[derive(Debug, Args)]
 struct RemoveArgs {
@@ -92,7 +145,8 @@ struct PathArgs {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match execute(&cli) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(0) => ExitCode::SUCCESS,
+        Ok(code) => ExitCode::from(code),
         Err(error) => {
             if cli.json {
                 println!(
@@ -106,23 +160,26 @@ fn main() -> ExitCode {
         }
     }
 }
-fn execute(cli: &Cli) -> anyhow::Result<()> {
+/// Exit status: 0 success, 1 error, 2 conflicts (or `status --exit-code` findings).
+fn execute(cli: &Cli) -> anyhow::Result<u8> {
     match &cli.command {
         Commands::Init(a) => init(cli, a),
         Commands::Add(a) => add(cli, a),
-        Commands::Remove(a) => remove(cli, a),
-        Commands::List => list(cli),
-        Commands::Doctor(a) => doctor(cli, a),
-        Commands::Validate(a) => validate(cli, a),
+        Commands::Upgrade(a) => upgrade(cli, a),
+        Commands::Status(a) => status(cli, a),
+        Commands::Remove(a) => remove(cli, a).map(|()| 0),
+        Commands::List => list(cli).map(|()| 0),
+        Commands::Doctor(a) => doctor(cli, a).map(|()| 0),
+        Commands::Validate(a) => validate(cli, a).map(|()| 0),
         Commands::Recipe {
             command: RecipeCommands::Validate { path },
-        } => validate_recipe(path),
+        } => validate_recipe(path).map(|()| 0),
     }
 }
 fn registry(cli: &Cli) -> CompositeRegistry {
     CompositeRegistry::new(cli.recipe_root.clone())
 }
-fn init(cli: &Cli, args: &InitArgs) -> anyhow::Result<()> {
+fn init(cli: &Cli, args: &InitArgs) -> anyhow::Result<u8> {
     if cli.json && !args.non_interactive {
         anyhow::bail!("--json requires --non-interactive");
     }
@@ -138,13 +195,14 @@ fn init(cli: &Cli, args: &InitArgs) -> anyhow::Result<()> {
     let preview = preview_init(&root, &registry, request)?;
     apply_preview(cli, &root, preview, args.yes, args.run_commands)
 }
-fn add(cli: &Cli, args: &ModifyArgs) -> anyhow::Result<()> {
+fn add(cli: &Cli, args: &ModifyArgs) -> anyhow::Result<u8> {
     let registry = registry(cli);
-    let preview = preview_add(
+    let preview = preview_add_with(
         &args.directory,
         &registry,
         args.recipes.clone(),
         capabilities(&registry)?,
+        args.conflicts.into(),
     )?;
     apply_preview(cli, &args.directory, preview, args.yes, args.run_commands)
 }
@@ -214,8 +272,14 @@ fn validate(cli: &Cli, args: &PathArgs) -> anyhow::Result<()> {
     let r = registry(cli);
     let state = load_state(&args.directory)?;
     for installed in &state.recipes {
-        if r.get(&installed.name)?.document.metadata.version != installed.version {
-            anyhow::bail!("recipe version mismatch for {}", installed.name);
+        let available = r.get(&installed.name)?.document.metadata.version;
+        if available != installed.version {
+            anyhow::bail!(
+                "recipe version mismatch for {} (installed {}, available {}); run `scafflare upgrade`",
+                installed.name,
+                installed.version,
+                available
+            );
         }
     }
     if !cli.quiet {
@@ -437,10 +501,21 @@ fn apply_preview(
     preview: GenerationPreview,
     yes: bool,
     run: bool,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<u8> {
+    report_conflicts(cli, &preview.conflicts);
+    let aborted = preview.has_conflicts() && !preview.plan.has_changes();
+    if aborted {
+        if cli.json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":false,"conflicts":preview.conflicts,"outcomes":preview.outcomes})
+            );
+        }
+        return Ok(2);
+    }
     show_plan(cli, &preview.plan);
     if !approve(cli, &preview.plan, yes)? {
-        return Ok(());
+        return Ok(0);
     }
     commit(root, &preview.plan)?;
     if run {
@@ -453,7 +528,7 @@ fn apply_preview(
     if cli.json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"recipes":preview.resolution.names(),"plan":preview.plan})
+            serde_json::json!({"ok":true,"recipes":preview.resolution.names(),"plan":preview.plan,"outcomes":preview.outcomes,"conflicts":preview.conflicts})
         );
     } else if !cli.quiet {
         println!(
@@ -462,13 +537,188 @@ fn apply_preview(
             root.display()
         );
     }
-    Ok(())
+    Ok(if preview.has_conflicts() { 2 } else { 0 })
 }
+
+fn report_conflicts(cli: &Cli, conflicts: &[Conflict]) {
+    if conflicts.is_empty() || cli.json {
+        return;
+    }
+    eprintln!(
+        "{} {} conflict(s):",
+        style("conflict").red().bold(),
+        conflicts.len()
+    );
+    for conflict in conflicts {
+        let detail = if conflict.json_paths.is_empty() {
+            String::new()
+        } else {
+            format!(" at {}", conflict.json_paths.join(", "))
+        };
+        eprintln!(
+            "  {} ({:?}{detail}) from recipe {}",
+            conflict.path.display(),
+            conflict.kind,
+            conflict.recipe
+        );
+    }
+}
+
+fn upgrade(cli: &Cli, args: &UpgradeArgs) -> anyhow::Result<u8> {
+    let registry = registry(cli);
+    let options = UpgradeOptions {
+        conflict_mode: args.conflicts.into(),
+        variables: parse_sets(&args.set)?,
+    };
+    let up = preview_upgrade(
+        &args.directory,
+        &registry,
+        capabilities(&registry)?,
+        options,
+    )?;
+    let preview = &up.preview;
+    report_conflicts(cli, &preview.conflicts);
+    let aborted = preview.has_conflicts() && !preview.plan.has_changes();
+    let envelope = |ok: bool, dry_run: bool| {
+        serde_json::json!({
+            "ok": ok,
+            "dry_run": dry_run,
+            "from": up.from,
+            "to": up.to,
+            "plan": preview.plan,
+            "outcomes": preview.outcomes,
+            "conflicts": preview.conflicts,
+        })
+    };
+    if aborted {
+        if cli.json {
+            println!("{}", envelope(false, args.dry_run));
+        }
+        return Ok(2);
+    }
+    if args.diff && !cli.json {
+        for change in &preview.plan.changes {
+            if let Some(diff) = scafflare_core::plan::unified_diff(&args.directory, change) {
+                if !scafflare_core::blobs::is_blob_path(&change.path) {
+                    print!("{diff}");
+                }
+            }
+        }
+    }
+    let code = if preview.has_conflicts() { 2 } else { 0 };
+    if args.dry_run {
+        if cli.json {
+            println!("{}", envelope(!preview.has_conflicts(), true));
+        } else if !cli.quiet {
+            show_plan(cli, &preview.plan);
+            println!("{} dry run: nothing was written", style("note").cyan());
+        }
+        return Ok(code);
+    }
+    if !preview.plan.has_changes() {
+        if cli.json {
+            println!("{}", envelope(true, false));
+        } else if !cli.quiet {
+            println!(
+                "{} project is already up to date",
+                style("done").green().bold()
+            );
+        }
+        return Ok(code);
+    }
+    show_plan(cli, &preview.plan);
+    if !approve(cli, &preview.plan, args.yes)? {
+        return Ok(0);
+    }
+    commit(&args.directory, &preview.plan)?;
+    if args.run_commands {
+        run_safe_validation_commands(&preview.resolution, &args.directory)?;
+    }
+    if cli.json {
+        println!("{}", envelope(!preview.has_conflicts(), false));
+    } else if !cli.quiet {
+        for (from, to) in up.from.iter().filter_map(|from| {
+            up.to
+                .iter()
+                .find(|to| to.name == from.name && to.version != from.version)
+                .map(|to| (from, to))
+        }) {
+            println!("upgraded {} {} -> {}", from.name, from.version, to.version);
+        }
+        println!(
+            "{} upgraded {}",
+            style("done").green().bold(),
+            args.directory.display()
+        );
+    }
+    Ok(code)
+}
+
+fn status(cli: &Cli, args: &StatusArgs) -> anyhow::Result<u8> {
+    let registry = registry(cli);
+    let status = project_status(&args.directory, &registry)?;
+    if cli.json {
+        println!("{}", serde_json::to_string(&status)?);
+    } else if !cli.quiet {
+        println!("project: {}", status.project_name);
+        for recipe in &status.recipes {
+            let label = match recipe.state {
+                RecipeState::Current => "current".to_owned(),
+                RecipeState::Outdated => format!(
+                    "outdated (available {})",
+                    recipe
+                        .available
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_default()
+                ),
+                RecipeState::NewerThanRegistry => "newer than this scafflare".to_owned(),
+                RecipeState::MissingFromRegistry => "missing from registry".to_owned(),
+            };
+            println!("  {} {}: {label}", recipe.name, recipe.installed);
+        }
+        for file in &status.files {
+            match file.state {
+                FileState::Clean => {}
+                FileState::Modified => println!("  modified   {}", file.path),
+                FileState::Missing => println!("  missing    {}", file.path),
+                FileState::Conflicted => println!("  conflicted {}", file.path),
+            }
+        }
+        if status.legacy_files > 0 {
+            println!(
+                "note: {} file(s) have no merge base (lockfile v1); run `scafflare upgrade` to record them",
+                status.legacy_files
+            );
+        }
+        if !status.needs_attention() {
+            println!(
+                "{} project is clean and up to date",
+                style("ok").green().bold()
+            );
+        }
+    }
+    Ok(if args.exit_code && status.needs_attention() {
+        2
+    } else {
+        0
+    })
+}
+
 fn show_plan(cli: &Cli, plan: &FilePlan) {
     if cli.quiet || cli.json {
         return;
     }
-    for change in &plan.changes {
+    let snapshots = plan
+        .changes
+        .iter()
+        .filter(|change| scafflare_core::blobs::is_blob_path(&change.path))
+        .count();
+    for change in plan
+        .changes
+        .iter()
+        .filter(|change| !scafflare_core::blobs::is_blob_path(&change.path))
+    {
         let tag = match change.kind {
             ChangeKind::Create => "create",
             ChangeKind::Update => "update",
@@ -477,6 +727,12 @@ fn show_plan(cli: &Cli, plan: &FilePlan) {
             ChangeKind::Skip => "skip",
         };
         println!("{tag:8} {} ({})", change.path.display(), change.recipe);
+    }
+    if snapshots > 0 {
+        println!(
+            "{:8} {snapshots} merge base snapshot(s) in .scafflare/base",
+            "state"
+        );
     }
 }
 fn approve(cli: &Cli, plan: &FilePlan, yes: bool) -> anyhow::Result<bool> {

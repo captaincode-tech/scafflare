@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/captaincode-tech/scafflare/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/captaincode-tech/scafflare/actions/workflows/ci.yml)
 [![Release](https://github.com/captaincode-tech/scafflare/actions/workflows/release.yml/badge.svg)](https://github.com/captaincode-tech/scafflare/actions/workflows/release.yml)
-[![Rust 1.75+](https://img.shields.io/badge/Rust-1.75%2B-orange?logo=rust)](https://www.rust-lang.org/)
+[![Rust 1.85+](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Telegram Channel](https://img.shields.io/badge/Telegram-Channel-2CA5E0?logo=telegram&logoColor=white)](https://t.me/captaincode_tech)
 
@@ -18,7 +18,7 @@
 
 ### Build from source
 
-Building from source requires Rust Stable 1.75 or later.
+Building from source requires Rust Stable 1.85 or later.
 
 ```bash
 git clone https://github.com/captaincode-tech/scafflare.git
@@ -29,7 +29,7 @@ cargo build --release
 
 ### Release binaries
 
-Versioned Linux, macOS, and Windows archives will be attached to GitHub Releases after a maintainer pushes a verified version tag such as `v0.1.0`. Each archive is accompanied by the `SHA256SUMS` checksum manifest. No release has been published yet.
+Versioned Linux, macOS, and Windows archives will be attached to GitHub Releases after a maintainer pushes a verified version tag such as `v0.2.0`. Each archive is accompanied by the `SHA256SUMS` checksum manifest. No release has been published yet.
 
 ## Quick start
 
@@ -67,6 +67,8 @@ For the interactive wizard, run `scafflare init todo-api`. Scafflare displays a 
 | `scafflare init <project-name>` | Create a project with the wizard or non-interactive flags. |
 | `scafflare add <recipe...>` | Add recipes to a managed project. |
 | `scafflare remove <recipe>` | Safely remove a recipe and exclusively owned, unmodified files. |
+| `scafflare upgrade` | Bring installed recipes to the bundled versions with a three-way merge that keeps your edits. |
+| `scafflare status` | Show outdated recipes, modified files, and unresolved conflicts. |
 | `scafflare list` | List bundled recipes. |
 | `scafflare doctor` | Check Node.js, npm, and the project lockfile. |
 | `scafflare validate` | Validate the lockfile and versions of installed recipes. |
@@ -86,6 +88,29 @@ Global `--json` and `--quiet` options support CI and automation. `--json` writes
 | Quality | `vitest`, `biome`, `husky-lint-staged`, `github-actions` |
 
 Selecting **Clean + SQLite** automatically adds `zod` and generates a working Todo CRUD flow through `Route → Controller → Service → Repository Interface → Drizzle Repository → Database`.
+
+## Upgrading projects
+
+Recipes improve over time. `scafflare upgrade` updates a generated project **without losing your changes** by comparing three versions of every managed file: the pristine render recorded at the last run (the *base*, stored in `.scafflare/base/`), your working tree, and the new render.
+
+```bash
+scafflare status                  # what is outdated, modified, or conflicted?
+scafflare upgrade --dry-run --diff  # preview exactly what would change
+scafflare upgrade                 # apply (asks for confirmation; use --yes in CI)
+```
+
+| Situation | Result |
+|---|---|
+| You did not touch the file | Updated to the new template. |
+| The template did not change | Your edits are kept. |
+| Both changed, different regions | Merged; JSON (`package.json`) merges key by key. |
+| Both changed the same region | **Conflict.** By default nothing is written and every conflict is reported (exit code 2). |
+| You deleted a file the template still renders unchanged | Deletion is honoured. |
+| The template stopped rendering a file you edited | Kept on disk and no longer managed. |
+
+Use `--conflicts markers` to write git-style markers into text files, or a `<file>.scafflare-new` sidecar for JSON and files Scafflare did not create. `scafflare status` lists these as conflicted and `upgrade`/`add` refuse to continue until you resolve them. `--set KEY=VALUE` supplies values for variables introduced by newer recipes. Commit `.scafflare/` to version control; projects created with 0.1 are migrated automatically (files without a recorded base fall back to fast-forward when untouched and a reported conflict otherwise).
+
+Exit codes: `0` success, `1` error, `2` conflicts (or `status --exit-code` findings). With `--json`, output is a stable envelope with `ok`, `from`, `to`, `plan`, `outcomes`, and `conflicts`.
 
 ## Authoring a recipe
 
@@ -137,10 +162,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo build --workspace --release
 scripts/verify-fixtures.sh
+scripts/verify-upgrade.sh
 cargo audit
 ```
 
-CI runs the Rust gates and release build on Linux, macOS, and Windows. It also validates every official recipe and generates six supported Node.js/TypeScript fixtures; each fixture is installed, audited with `npm audit --omit=dev`, type-checked, linted, tested, and built. See the current [validation report](docs/validation-report.md).
+CI runs the Rust gates and release build on Linux, macOS, and Windows. It also validates every official recipe and generates six supported Node.js/TypeScript fixtures and upgrades real legacy projects with three-way merge; each fixture is installed, audited with `npm audit --omit=dev`, type-checked, linted, tested, and built. See the current [validation report](docs/validation-report.md).
 
 ## Security
 
@@ -148,7 +174,7 @@ See [SECURITY.md](SECURITY.md) for reporting guidance and the recipe threat mode
 
 ## MVP scope and limitations
 
-Online registries, signature verification, native plugins, Laravel/Python/Go recipes, Prisma, and Docker are intentionally outside the `0.1.0` scope. The registry abstraction and bundled recipes provide the basis for later development. Recipe removal intentionally does not remove package-manager dependencies from manifests, which prevents unsafe removal of shared dependencies.
+Online registries, signature verification, native plugins, Laravel/Python/Go recipes, Prisma, and Docker are intentionally outside the current scope. The registry abstraction and bundled recipes provide the basis for later development. Recipe removal intentionally does not remove package-manager dependencies from manifests, which prevents unsafe removal of shared dependencies. Upgrades apply to all installed recipes at once, ask no new interactive prompts (use `--set`), and merge JSON only (no YAML or TOML yet).
 
 ## Contributing
 

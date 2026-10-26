@@ -18,6 +18,8 @@ Please include the affected version or commit, a minimal reproduction, impact as
 
 Recipes are declarative data by default. Scafflare rejects absolute paths, `..`, Windows path prefixes, and paths outside the project sandbox. Recipe-supplied external commands are retained for display and can run only with the user’s explicit `--run-commands` opt-in. String and shell-form commands are not executable. The MVP has no online registry and does not run script hooks.
 
+Upgrade data is inert: merge bases in `.scafflare/base/` are content-addressed files (verified by SHA-256 before use, never executed), and lockfile entries are validated on load, so a hand-edited or malicious `.scafflare/lock.yaml` cannot reference paths outside the project or malformed hashes. All writes, including bases and `.scafflare-new` sidecars, pass through the same symbolic-link-rejecting transaction as generation.
+
 ## Dependency security
 
 The repository validates Rust dependencies with `cargo audit` and validates generated production dependency trees with `npm audit --omit=dev`. Dependabot is configured to propose updates for Cargo manifests and GitHub Actions. Security checks do not replace review of dependency update compatibility or generated-project behavior.

@@ -1,8 +1,11 @@
 #![forbid(unsafe_code)]
 
+pub mod blobs;
 pub mod error;
+pub mod merge;
 pub mod plan;
 pub mod recipe;
+pub mod reconcile;
 pub mod registry;
 pub mod render;
 pub mod resolver;
@@ -13,18 +16,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+use semver::Version;
+use serde::Serialize;
 use serde_json::Value;
 
+use blobs::content_hash;
 use error::{Result, ScafflareError};
-use plan::{ChangeKind, FilePlan, PlannedChange};
+use plan::FilePlan;
 use recipe::LoadedRecipe;
+use reconcile::{reconcile, unresolved_conflicts, Mode, ReconcileInput};
+pub use reconcile::{Conflict, ConflictKind, ConflictMode, Outcome, OutcomeKind};
 use registry::RecipeRegistry;
 use render::{build_context, render_resolution};
 use resolver::{Resolution, Resolver};
-use state::{
-    load_state, lockfile_path, serialize_state, InstalledRecipe, ManagedFile, ProjectState,
-};
-use transaction::{apply_plan, sha256_hex};
+use state::{load_state, InstalledRecipe, ProjectState};
+use transaction::apply_plan;
 
 #[derive(Debug, Clone)]
 pub struct GenerationRequest {
@@ -40,6 +46,28 @@ pub struct GenerationPreview {
     pub variables: BTreeMap<String, Value>,
     pub plan: FilePlan,
     pub state: ProjectState,
+    pub outcomes: Vec<Outcome>,
+    pub conflicts: Vec<Conflict>,
+}
+
+impl GenerationPreview {
+    pub fn has_conflicts(&self) -> bool {
+        !self.conflicts.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct UpgradeOptions {
+    pub conflict_mode: ConflictMode,
+    /// Variable overrides (`--set`) applied on top of the stored variables.
+    pub variables: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpgradePreview {
+    pub preview: GenerationPreview,
+    pub from: Vec<InstalledRecipe>,
+    pub to: Vec<InstalledRecipe>,
 }
 
 pub fn preview_init<R: RecipeRegistry>(
@@ -67,7 +95,15 @@ pub fn preview_init<R: RecipeRegistry>(
         });
     }
     let state = ProjectState::new(request.project_name, request.variables);
-    preview_generation(root, registry, request.recipes, request.capabilities, state)
+    preview_generation(
+        root,
+        registry,
+        request.recipes,
+        request.capabilities,
+        state,
+        Mode::Init,
+        ConflictMode::Abort,
+    )
 }
 
 pub fn preview_add<R: RecipeRegistry>(
@@ -76,7 +112,19 @@ pub fn preview_add<R: RecipeRegistry>(
     recipes: Vec<String>,
     capabilities: BTreeSet<String>,
 ) -> Result<GenerationPreview> {
+    preview_add_with(root, registry, recipes, capabilities, ConflictMode::Abort)
+}
+
+pub fn preview_add_with<R: RecipeRegistry>(
+    root: &Path,
+    registry: &R,
+    recipes: Vec<String>,
+    capabilities: BTreeSet<String>,
+    conflict_mode: ConflictMode,
+) -> Result<GenerationPreview> {
     let state = load_state(root)?;
+    ensure_conflicts_resolved(root, &state)?;
+    ensure_up_to_date(registry, &state)?;
     let mut combined: Vec<String> = state
         .recipes
         .iter()
@@ -87,7 +135,86 @@ pub fn preview_add<R: RecipeRegistry>(
             combined.push(recipe);
         }
     }
-    preview_generation(root, registry, combined, capabilities, state)
+    preview_generation(
+        root,
+        registry,
+        combined,
+        capabilities,
+        state,
+        Mode::Add,
+        conflict_mode,
+    )
+}
+
+/// Bring every installed recipe to the registry version with a three-way merge.
+pub fn preview_upgrade<R: RecipeRegistry>(
+    root: &Path,
+    registry: &R,
+    capabilities: BTreeSet<String>,
+    options: UpgradeOptions,
+) -> Result<UpgradePreview> {
+    let mut state = load_state(root)?;
+    ensure_conflicts_resolved(root, &state)?;
+    for installed in &state.recipes {
+        let available = registry.get(&installed.name)?.document.metadata.version;
+        if available < installed.version {
+            return Err(ScafflareError::Downgrade {
+                recipe: installed.name.clone(),
+                installed: installed.version.to_string(),
+                available: available.to_string(),
+            });
+        }
+    }
+    let from = state.recipes.clone();
+    let requested: Vec<String> = from.iter().map(|recipe| recipe.name.clone()).collect();
+    state.variables.extend(options.variables);
+    let preview = preview_generation(
+        root,
+        registry,
+        requested,
+        capabilities,
+        state,
+        Mode::Upgrade,
+        options.conflict_mode,
+    )?;
+    let to = preview.state.recipes.clone();
+    Ok(UpgradePreview { preview, from, to })
+}
+
+fn ensure_up_to_date<R: RecipeRegistry>(registry: &R, state: &ProjectState) -> Result<()> {
+    for installed in &state.recipes {
+        let available = registry.get(&installed.name)?.document.metadata.version;
+        if available != installed.version {
+            return Err(ScafflareError::OutdatedProject {
+                recipe: installed.name.clone(),
+                installed: installed.version.to_string(),
+                available: available.to_string(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn ensure_conflicts_resolved(root: &Path, state: &ProjectState) -> Result<()> {
+    let unresolved = unresolved_conflicts(root, &state.managed_files);
+    if unresolved.is_empty() {
+        Ok(())
+    } else {
+        Err(ScafflareError::UnresolvedConflicts {
+            paths: unresolved.join(", "),
+        })
+    }
+}
+
+fn installed_recipes(resolution: &Resolution) -> Vec<InstalledRecipe> {
+    resolution
+        .recipes
+        .iter()
+        .map(|recipe| InstalledRecipe {
+            name: recipe.document.metadata.name.clone(),
+            version: recipe.document.metadata.version.clone(),
+        })
+        .collect()
 }
 
 fn preview_generation<R: RecipeRegistry>(
@@ -96,77 +223,31 @@ fn preview_generation<R: RecipeRegistry>(
     recipes: Vec<String>,
     capabilities: BTreeSet<String>,
     state: ProjectState,
+    mode: Mode,
+    conflict_mode: ConflictMode,
 ) -> Result<GenerationPreview> {
     let resolution = Resolver::new(registry, capabilities).resolve(&recipes)?;
     let variables = build_context(&resolution, &state.variables);
-    let mut rendered = render_resolution(&resolution, &variables)?;
-    for file in &mut rendered {
-        if matches!(file.strategy, recipe::FileStrategy::Create)
-            && state
-                .managed_files
-                .contains_key(&file.destination.to_string_lossy().to_string())
-        {
-            file.strategy = recipe::FileStrategy::Replace;
-        }
-    }
-    let mut plan = plan::plan_files(root, &rendered)?;
-    guard_modified_managed_files(root, &state, &mut plan, false)?;
-    let mut next_state = state;
+    let rendered = render_resolution(&resolution, &variables)?;
+    let mut next_state = state.clone();
     next_state.variables = variables.clone();
-    next_state.recipes = resolution
-        .recipes
-        .iter()
-        .map(|recipe| InstalledRecipe {
-            name: recipe.document.metadata.name.clone(),
-            version: recipe.document.metadata.version.clone(),
-        })
-        .collect();
-    update_managed_files(&mut next_state, &plan, &rendered);
-    append_lockfile_change(root, &mut plan, &next_state)?;
+    next_state.recipes = installed_recipes(&resolution);
+    let reconciled = reconcile(ReconcileInput {
+        root,
+        rendered: &rendered,
+        old_managed: &state.managed_files,
+        next_state,
+        mode,
+        conflict_mode,
+    })?;
     Ok(GenerationPreview {
         resolution,
         variables,
-        plan,
-        state: next_state,
+        plan: reconciled.plan,
+        state: reconciled.state,
+        outcomes: reconciled.outcomes,
+        conflicts: reconciled.conflicts,
     })
-}
-
-fn guard_modified_managed_files(
-    root: &Path,
-    state: &ProjectState,
-    plan: &mut FilePlan,
-    preserve: bool,
-) -> Result<()> {
-    for change in &mut plan.changes {
-        if !matches!(
-            change.kind,
-            ChangeKind::Create | ChangeKind::Update | ChangeKind::Delete
-        ) {
-            continue;
-        }
-        let Some(managed) = state
-            .managed_files
-            .get(change.path.to_string_lossy().as_ref())
-        else {
-            continue;
-        };
-        let path = root.join(&change.path);
-        if path.exists() {
-            let current = fs::read(&path).map_err(|error| ScafflareError::io(&path, error))?;
-            if sha256_hex(&current) != managed.sha256 {
-                if preserve {
-                    change.kind = ChangeKind::Skip;
-                    change.contents = None;
-                } else {
-                    return Err(ScafflareError::FileConflict {
-                        path: change.path.clone(),
-                        reason: "refusing to overwrite a user-modified managed file".to_owned(),
-                    });
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 pub fn preview_remove<R: RecipeRegistry>(
@@ -176,6 +257,7 @@ pub fn preview_remove<R: RecipeRegistry>(
     capabilities: BTreeSet<String>,
 ) -> Result<(FilePlan, ProjectState)> {
     let current_state = load_state(root)?;
+    ensure_up_to_date(registry, &current_state)?;
     if !current_state.has_recipe(recipe) {
         return Err(ScafflareError::InvalidInput(format!(
             "recipe `{recipe}` is not installed"
@@ -197,47 +279,135 @@ pub fn preview_remove<R: RecipeRegistry>(
     let resolution = Resolver::new(registry, capabilities).resolve(&requested)?;
     let variables = build_context(&resolution, &next_state.variables);
     next_state.variables = variables.clone();
-    let mut rendered = render_resolution(&resolution, &variables)?;
-    for file in &mut rendered {
-        if current_state
-            .managed_files
-            .contains_key(&file.destination.to_string_lossy().to_string())
-        {
-            file.strategy = recipe::FileStrategy::Replace;
-        }
+    next_state.recipes = installed_recipes(&resolution);
+    let rendered = render_resolution(&resolution, &variables)?;
+    let reconciled = reconcile(ReconcileInput {
+        root,
+        rendered: &rendered,
+        old_managed: &current_state.managed_files,
+        next_state,
+        mode: Mode::Remove,
+        conflict_mode: ConflictMode::Abort,
+    })?;
+    Ok((reconciled.plan, reconciled.state))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecipeState {
+    Current,
+    Outdated,
+    NewerThanRegistry,
+    MissingFromRegistry,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RecipeStatus {
+    pub name: String,
+    pub installed: Version,
+    pub available: Option<Version>,
+    pub state: RecipeState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FileState {
+    Clean,
+    Modified,
+    Missing,
+    Conflicted,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FileStatus {
+    pub path: String,
+    pub state: FileState,
+    /// False for files recorded by a version 1 lockfile (no merge ancestor).
+    pub has_base: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectStatus {
+    pub project_name: String,
+    pub recipes: Vec<RecipeStatus>,
+    pub files: Vec<FileStatus>,
+    pub outdated: bool,
+    pub conflicted: bool,
+    pub modified: usize,
+    pub missing: usize,
+    pub legacy_files: usize,
+}
+
+impl ProjectStatus {
+    /// True when anything deserves attention (used by `status --exit-code`).
+    pub fn needs_attention(&self) -> bool {
+        self.outdated || self.conflicted || self.modified > 0 || self.missing > 0
     }
-    let mut plan = plan::plan_files(root, &rendered)?;
+}
 
-    for (relative, managed) in &current_state.managed_files {
-        let still_rendered = rendered
-            .iter()
-            .any(|file| file.destination == Path::new(relative));
-        if !still_rendered && managed.recipes.len() == 1 && managed.recipes[0] == recipe {
-            let path = root.join(relative);
-            if path.exists() {
-                plan.changes.push(PlannedChange {
-                    kind: ChangeKind::Delete,
-                    path: relative.into(),
-                    recipe: recipe.to_owned(),
-                    contents: None,
-                });
-            }
-        }
+pub fn project_status<R: RecipeRegistry>(root: &Path, registry: &R) -> Result<ProjectStatus> {
+    let state = load_state(root)?;
+    let mut recipes = Vec::new();
+    let mut outdated = false;
+    for installed in &state.recipes {
+        let available = registry
+            .get(&installed.name)
+            .ok()
+            .map(|recipe| recipe.document.metadata.version);
+        let recipe_state = match &available {
+            None => RecipeState::MissingFromRegistry,
+            Some(version) if *version == installed.version => RecipeState::Current,
+            Some(version) if *version > installed.version => RecipeState::Outdated,
+            Some(_) => RecipeState::NewerThanRegistry,
+        };
+        outdated |= recipe_state == RecipeState::Outdated;
+        recipes.push(RecipeStatus {
+            name: installed.name.clone(),
+            installed: installed.version.clone(),
+            available,
+            state: recipe_state,
+        });
     }
 
-    guard_modified_managed_files(root, &current_state, &mut plan, true)?;
-
-    next_state.recipes = resolution
-        .recipes
-        .iter()
-        .map(|loaded| InstalledRecipe {
-            name: loaded.document.metadata.name.clone(),
-            version: loaded.document.metadata.version.clone(),
-        })
+    let unresolved: BTreeSet<String> = unresolved_conflicts(root, &state.managed_files)
+        .into_iter()
         .collect();
-    update_managed_files(&mut next_state, &plan, &rendered);
-    append_lockfile_change(root, &mut plan, &next_state)?;
-    Ok((plan, next_state))
+    let mut files = Vec::new();
+    let (mut modified, mut missing, mut legacy_files) = (0, 0, 0);
+    for (path, managed) in &state.managed_files {
+        let file_state = if unresolved.contains(path) {
+            FileState::Conflicted
+        } else {
+            match fs::read(root.join(path)) {
+                Err(_) => FileState::Missing,
+                Ok(bytes) if content_hash(&bytes) == managed.sha256 => FileState::Clean,
+                Ok(_) => FileState::Modified,
+            }
+        };
+        match file_state {
+            FileState::Modified => modified += 1,
+            FileState::Missing => missing += 1,
+            _ => {}
+        }
+        if managed.base.is_none() {
+            legacy_files += 1;
+        }
+        files.push(FileStatus {
+            path: path.clone(),
+            state: file_state,
+            has_base: managed.base.is_some(),
+        });
+    }
+    Ok(ProjectStatus {
+        project_name: state.project_name,
+        recipes,
+        files,
+        outdated,
+        conflicted: !unresolved.is_empty(),
+        modified,
+        missing,
+        legacy_files,
+    })
 }
 
 pub fn commit(root: &Path, plan: &FilePlan) -> Result<()> {
@@ -293,67 +463,6 @@ pub fn run_safe_validation_commands(
         }
     }
     Ok(results)
-}
-
-fn update_managed_files(
-    state: &mut ProjectState,
-    plan: &FilePlan,
-    rendered: &[render::RenderedFile],
-) {
-    for change in &plan.changes {
-        if matches!(change.kind, ChangeKind::Create | ChangeKind::Update)
-            && change.path != Path::new(".scafflare/lock.yaml")
-        {
-            if let Some(contents) = &change.contents {
-                let mut owners: Vec<String> = rendered
-                    .iter()
-                    .filter(|file| {
-                        file.destination == change.path
-                            && !matches!(file.strategy, recipe::FileStrategy::Skip)
-                    })
-                    .map(|file| file.recipe.clone())
-                    .collect();
-                owners.sort();
-                owners.dedup();
-                let file = state
-                    .managed_files
-                    .entry(change.path.to_string_lossy().to_string())
-                    .or_insert_with(|| ManagedFile {
-                        recipes: Vec::new(),
-                        sha256: String::new(),
-                    });
-                file.recipes = owners;
-                file.sha256 = sha256_hex(contents);
-            }
-        }
-    }
-}
-
-fn append_lockfile_change(root: &Path, plan: &mut FilePlan, state: &ProjectState) -> Result<()> {
-    let path = lockfile_path(root);
-    let contents = serialize_state(state)?;
-    let kind = match fs::read(&path) {
-        Ok(existing) if existing == contents => ChangeKind::Unchanged,
-        Ok(_) => ChangeKind::Update,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => ChangeKind::Create,
-        Err(error) => return Err(ScafflareError::io(&path, error)),
-    };
-    plan.changes.push(PlannedChange {
-        kind,
-        path: Path::new(".scafflare").join("lock.yaml"),
-        recipe: "scafflare-state".to_owned(),
-        contents: if kind == ChangeKind::Unchanged {
-            None
-        } else {
-            Some(contents)
-        },
-    });
-    plan.changes.sort_by(|left, right| {
-        left.path
-            .cmp(&right.path)
-            .then(left.recipe.cmp(&right.recipe))
-    });
-    Ok(())
 }
 
 fn is_valid_project_name(value: &str) -> bool {
@@ -476,7 +585,7 @@ mod integration_tests {
     }
 
     #[test]
-    fn add_refuses_user_modified_managed_file() {
+    fn add_never_overwrites_a_conflicting_user_modified_managed_file() {
         let temporary = tempfile::tempdir().unwrap();
         let root = temporary.path().join("protected-add");
         let registry = BundledRegistry::new();
@@ -484,13 +593,19 @@ mod integration_tests {
         commit(&root, &initial.plan).unwrap();
         fs::write(root.join("package.json"), "{\"user\": true}\n").unwrap();
 
-        let result = preview_add(
+        let preview = preview_add(
             &root,
             &registry,
             vec!["pino".to_owned()],
             BTreeSet::from(["node_runtime".to_owned(), "npm".to_owned()]),
+        )
+        .unwrap();
+        assert!(preview.has_conflicts());
+        assert!(
+            !preview.plan.has_changes(),
+            "abort mode must plan no writes"
         );
-        assert!(matches!(result, Err(ScafflareError::FileConflict { .. })));
+        commit(&root, &preview.plan).unwrap();
         assert_eq!(
             fs::read_to_string(root.join("package.json")).unwrap(),
             "{\"user\": true}\n"

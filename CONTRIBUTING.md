@@ -12,7 +12,9 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-Rust changes must include relevant tests. Recipe changes must pass `scafflare recipe validate` and at least one non-interactive generation. For Node.js template changes, run `npm install`, `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` for every affected fixture. Run `scripts/verify-fixtures.sh` before submitting a change that affects bundled recipes or generated Node.js projects.
+Rust changes must include relevant tests. Recipe changes must pass `scafflare recipe validate` and at least one non-interactive generation. For Node.js template changes, run `npm install`, `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` for every affected fixture. Run `scripts/verify-fixtures.sh` before submitting a change that affects bundled recipes or generated Node.js projects, and `scripts/verify-upgrade.sh` for changes to upgrade, merge, or lockfile behavior.
+
+Upgrades are driven by recipe versions: if you change the content of an official recipe, bump its `metadata.version` and refresh the manifest with `UPDATE_CHECKSUMS=1 cargo test -p scafflare-core --test recipe_checksums`. CI fails when content changes without a version bump. Golden project trees can be refreshed with `UPDATE_GOLDEN=1 cargo test -p scafflare --test golden_trees` after reviewing the diff.
 
 ## Design principles
 

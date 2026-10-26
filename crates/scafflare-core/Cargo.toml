@@ -15,6 +15,7 @@ publish = false
 
 [dependencies]
 anyhow.workspace = true
+diffy = "0.4.2"
 include_dir.workspace = true
 minijinja.workspace = true
 semver.workspace = true
@@ -26,4 +27,5 @@ thiserror.workspace = true
 walkdir.workspace = true
 
 [dev-dependencies]
+proptest = "1.8.0"
 tempfile.workspace = true

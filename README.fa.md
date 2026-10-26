@@ -79,6 +79,29 @@ npm run dev
 
 ‏انتخاب **Clean + SQLite** به‌صورت خودکار `zod` را اضافه می‌کند و Todo CRUD واقعی در مسیر `Route → Controller → Service → Repository Interface → Drizzle Repository → Database` تولید می‌شود.
 
+## ‏ارتقای پروژه‌ها
+
+‏Recipeها به‌مرور بهتر می‌شوند. `scafflare upgrade` پروژه را **بدون از دست رفتن تغییرات شما** به‌روز می‌کند: برای هر فایل مدیریت‌شده سه نسخه مقایسه می‌شود، یعنی render خالصِ ثبت‌شده در آخرین اجرا (*base* در `.scafflare/base/`)، فایل فعلی شما و render جدید.
+
+```bash
+scafflare status                    # چه چیزی قدیمی، تغییرکرده یا conflict دارد؟
+scafflare upgrade --dry-run --diff  # پیش‌نمایش دقیق تغییرات
+scafflare upgrade                   # اعمال (با تأیید؛ در CI از --yes استفاده کنید)
+```
+
+| ‏وضعیت | ‏نتیجه |
+|---|---|
+| ‏فایل را تغییر نداده‌اید | ‏به template جدید به‌روز می‌شود |
+| ‏template عوض نشده | ‏تغییرات شما حفظ می‌شود |
+| ‏هر دو تغییر کرده‌اند، در بخش‌های متفاوت | ‏merge می‌شود؛ JSON (مثل `package.json`) کلید‌به‌کلید merge می‌شود |
+| ‏هر دو یک بخش را تغییر داده‌اند | ‏**conflict**؛ به‌طور پیش‌فرض هیچ فایلی نوشته نمی‌شود و همهٔ conflictها گزارش می‌شوند (exit code 2) |
+| ‏فایلی را حذف کرده‌اید که template بدون تغییر هنوز می‌سازد | ‏حذف شما حفظ می‌شود |
+| ‏template دیگر فایلی را که ویرایش کرده‌اید تولید نمی‌کند | ‏فایل روی دیسک می‌ماند و دیگر مدیریت نمی‌شود |
+
+‏با `--conflicts markers` در فایل‌های متنی markerهای شبیه git نوشته می‌شود و برای JSON و فایل‌هایی که Scafflare نساخته، فایل کناری `<file>.scafflare-new` ساخته می‌شود. `scafflare status` این فایل‌ها را conflicted نشان می‌دهد و تا زمان حل شدن، `upgrade` و `add` ادامه نمی‌دهند. با `--set KEY=VALUE` مقدار متغیرهای جدید Recipeهای تازه را بدهید. پوشهٔ `.scafflare/` را در version control نگه دارید؛ پروژه‌های ساخته‌شده با 0.1 خودکار migrate می‌شوند.
+
+‏کد خروج: `0` موفق، `1` خطا، `2` conflict (یا یافتهٔ `status --exit-code`). خروجی `--json` یک envelope پایدار با `ok`، `from`، `to`، `plan`، `outcomes` و `conflicts` است.
+
 ## ‏ساخت Recipe جدید
 
 ‏هر Recipe یک پوشه با `recipe.yaml` و templateهای زیر `templates/` است:
@@ -129,6 +152,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo build --release
 scripts/verify-fixtures.sh
+scripts/verify-upgrade.sh
 cargo audit
 ```
 
@@ -136,7 +160,7 @@ cargo audit
 
 ## ‏وضعیت MVP و محدودیت‌ها
 
-‏Registry آنلاین، signature verification، pluginهای native، Laravel/Python/Go، Prisma و Docker عمداً خارج از scope نسخهٔ `0.1.0` هستند. registry abstraction و Recipeهای bundle شده، مبنای توسعهٔ بعدی را فراهم کرده‌اند. حذف Recipe وابستگی‌های package manager را از manifest پاک‌سازی نمی‌کند؛ این محدودیت برای جلوگیری از حذف ناامن dependencyهای اشتراکی در بخش Roadmap ثبت شده است.
+‏Registry آنلاین، signature verification، pluginهای native، Laravel/Python/Go، Prisma و Docker عمداً خارج از scope نسخهٔ فعلی هستند. registry abstraction و Recipeهای bundle شده، مبنای توسعهٔ بعدی را فراهم کرده‌اند. حذف Recipe وابستگی‌های package manager را از manifest پاک‌سازی نمی‌کند؛ این محدودیت برای جلوگیری از حذف ناامن dependencyهای اشتراکی در بخش Roadmap ثبت شده است.
 
 ## ‏مشارکت و امنیت
 

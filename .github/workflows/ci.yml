@@ -37,7 +37,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
+        env:
+          PROPTEST_CASES: '1024'
       - name: Release build
         run: cargo build --workspace --release
       - name: Upload binary
@@ -46,6 +48,15 @@ jobs:
           name: scafflare-${{ runner.os }}
           path: target/release/scafflare*
           if-no-files-found: error
+
+  msrv:
+    name: MSRV (Rust 1.85)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - name: Build and test on the minimum supported Rust version
+        run: cargo test --workspace --locked
 
   recipe-validation:
     name: Validate official recipes
@@ -56,8 +67,8 @@ jobs:
       - name: Validate recipes
         shell: bash
         run: |
-          for recipe in recipes/official/*; do
-            cargo run -q -p scafflare -- recipe validate "$recipe/recipe.yaml" --quiet
+          for recipe in recipes/official/*/; do
+            cargo run -q -p scafflare -- recipe validate "${recipe}recipe.yaml" --quiet
           done
 
   fixture-matrix:
@@ -74,3 +85,18 @@ jobs:
       - name: Generate, install, audit, typecheck, lint, test, and build fixtures
         shell: bash
         run: scripts/verify-fixtures.sh
+
+  upgrade-fixture:
+    name: Upgrade legacy projects with real npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update npm
+        run: npm install -g npm@latest
+      - name: Generate legacy projects, upgrade them, then install, typecheck, lint, test, and build
+        shell: bash
+        run: scripts/verify-upgrade.sh

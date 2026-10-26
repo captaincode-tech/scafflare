@@ -58,6 +58,26 @@ pub enum ScafflareError {
 
     #[error("serialization error: {0}")]
     Serialization(String),
+
+    #[error("{count} file(s) have conflicts; nothing was written (rerun with --conflicts markers to write conflict markers)")]
+    UpgradeConflicts { count: usize },
+
+    #[error("unresolved conflicts from a previous run: {paths}; resolve them and delete any `.scafflare-new` files first")]
+    UnresolvedConflicts { paths: String },
+
+    #[error("recipe `{recipe}` is installed at {installed} but the registry has {available}; run `scafflare upgrade` first")]
+    OutdatedProject {
+        recipe: String,
+        installed: String,
+        available: String,
+    },
+
+    #[error("refusing to downgrade recipe `{recipe}` from {installed} to {available}")]
+    Downgrade {
+        recipe: String,
+        installed: String,
+        available: String,
+    },
 }
 
 impl ScafflareError {

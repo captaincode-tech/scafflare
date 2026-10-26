@@ -48,13 +48,17 @@ jobs:
       - name: Validate official recipes
         shell: bash
         run: |
-          for recipe in recipes/official/*; do
-            cargo run --locked -q -p scafflare -- recipe validate "$recipe/recipe.yaml" --quiet
+          for recipe in recipes/official/*/; do
+            cargo run --locked -q -p scafflare -- recipe validate "${recipe}recipe.yaml" --quiet
           done
 
       - name: Validate generated fixtures
         shell: bash
         run: scripts/verify-fixtures.sh
+
+      - name: Validate upgrades of legacy projects
+        shell: bash
+        run: scripts/verify-upgrade.sh
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked

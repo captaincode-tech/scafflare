@@ -14,7 +14,9 @@ Scafflare یک CLI مستقل از زبان برای ساخت backendهای آم
 | `scafflare-core::recipe` | parse، schema validation و discovery | ندارد |
 | `scafflare-core::resolver` | dependency، conflict، compatibility و capability | ندارد |
 | `scafflare-core::render` | قالب MiniJinja و variable context | ندارد |
-| `scafflare-core::merge` | merge عمیق JSON و strategyهای فایل | ندارد |
+| `scafflare-core::merge` | merge سه‌طرفهٔ JSON (کلید‌به‌کلید) و متن (diff3) | ندارد |
+| `scafflare-core::reconcile` | تطبیق base/ours/theirs، conflict و outcome برای `init`/`add`/`upgrade`/`remove` | ندارد |
+| `scafflare-core::blobs` | ذخیرهٔ content-addressed مبنای merge در `.scafflare/base/` | ندارد |
 | `scafflare-core::transaction` | staging، preview، commit و rollback | ندارد |
 | `scafflare-core::state` | lockfile نسخه‌دار `.scafflare/lock.yaml` | ندارد |
 | `scafflare-core::doctor` | کنترل وضعیت ابزار و پروژه | ندارد |
@@ -95,10 +97,29 @@ post_generation_instructions:
 | `skip` | تغییر نمی‌دهد و در preview ثبت می‌شود | بله |
 | `fail` | وجود فایل مقصد را خطا می‌کند | بله |
 
+## ارتقا و merge سه‌طرفه
+
+lockfile نسخهٔ ۲ برای هر فایل مدیریت‌شده دو hash نگه می‌دارد: `sha256` (محتوای روی دیسک پس از آخرین عملیات، برای تشخیص تغییر کاربر) و `base` (render خالص بدون تغییر کاربر که در `.scafflare/base/<sha256>` ذخیره می‌شود و ancestor merge است). جداکردن این دو ضروری است؛ اگر hash فایل merge‌شده base می‌شد، ارتقای بعدی تغییرات کاربر را به‌عنوان تغییر template می‌دید و پاک می‌کرد. محتوای مقایسه‌شده و hash‌شده از نظر پایان خط (CRLF→LF) نرمال می‌شود و سبک پایان خط فایل کاربر هنگام نوشتن حفظ می‌شود.
+
+برای هر مسیر با B=base، O=دیسک و T=render جدید:
+
+| شرط | نتیجه |
+|---|---|
+| O == T | بدون نوشتن؛ base=T |
+| O == B | نوشتن T (fast-forward) |
+| T == B | حفظ O |
+| هر دو تغییر کرده‌اند | JSON: merge سه‌طرفهٔ ساختاری؛ متن: diff3؛ در غیر این صورت conflict |
+| T حذف شده | حذف اگر O == B، وگرنه فایل رها و orphan می‌شود |
+| O حذف شده | احترام به حذف اگر T == B، وگرنه conflict |
+| فایل جدید در T با فایل غیرمدیریت‌شده | adopt اگر یکسان است، وگرنه conflict |
+| بدون base (lockfile v1) | fast-forward اگر hash(O) برابر `sha256` است؛ JSON: merge افزایشی؛ متن: conflict `no_base` |
+
+همهٔ مسیرها پیش از هر نوشتن تحلیل می‌شوند؛ در حالت `abort` در صورت وجود conflict، plan خالی است و درخت پروژه byte-identical می‌ماند. ترتیب commit: فایل‌های پروژه، baseهای جدید، lockfile و در پایان حذف baseهای بی‌مصرف؛ بنابراین قطع شدن میانهٔ کار با اجرای دوبارهٔ `upgrade` همگرا می‌شود و lockfile قدیمی هرگز به base حذف‌شده اشاره نمی‌کند. `remove` عمداً محافظه‌کار است: فایل‌های تغییرداده‌شده حفظ و ورودی‌های manifest حذف نمی‌شوند.
+
 ## فرمت lockfile
 
 ```yaml
-lockfile_version: 1
+lockfile_version: 2
 project_name: acme-api
 recipes:
   - name: node
@@ -108,6 +129,11 @@ recipes:
 variables:
   framework: express
   architecture: clean
+managed_files:
+  package.json:
+    recipes: [node, express]
+    sha256: <hash محتوای روی دیسک>
+    base: <hash render خالص؛ در v1 وجود ندارد>
 ```
 
 ## خطا و خروجی
@@ -124,6 +150,7 @@ variables:
 - **ADR-002:** JSON deep merge به‌جای string injection برای manifestهای ساختاریافته.
 - **ADR-003:** command خارجی در data model باقی می‌ماند اما به‌صورت پیش‌فرض اجرا نمی‌شود.
 - **ADR-004:** Recipeها همراه binary bundle می‌شوند تا CLI در حالت offline کار کند.
+- **ارتقای سه‌طرفه (docs/adr/002-three-way-upgrade.md):** ارتقا با merge سه‌طرفه و base content-addressed.
 
 ## منابع
 

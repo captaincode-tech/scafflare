@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::blobs::normalize_eol;
 use crate::error::{Result, ScafflareError};
 use crate::recipe::FileStrategy;
 use crate::render::RenderedFile;
@@ -53,199 +53,122 @@ impl FilePlan {
     }
 }
 
-pub fn plan_files(root: &Path, rendered: &[RenderedFile]) -> Result<FilePlan> {
-    let mut desired = BTreeMap::<PathBuf, Vec<u8>>::new();
-    let mut owners = BTreeMap::<PathBuf, String>::new();
-    let mut plan = FilePlan::default();
+/// One path of the pure template render ("theirs" in a three-way merge).
+#[derive(Debug, Clone)]
+pub struct TreeEntry {
+    pub contents: Vec<u8>,
+    /// Recipes that contributed to this path (sorted, unique, never `skip`).
+    pub owners: Vec<String>,
+    /// Strategy of the last contributing recipe.
+    pub strategy: FileStrategy,
+    /// True when the final content is a structured JSON merge result.
+    pub json: bool,
+}
 
+/// Render every recipe file into an in-memory tree without consulting the disk.
+///
+/// Several recipes may contribute to one path (notably `package.json`); the
+/// result contains the single fully merged content.
+pub fn render_tree(rendered: &[RenderedFile]) -> Result<BTreeMap<PathBuf, TreeEntry>> {
+    let mut tree = BTreeMap::<PathBuf, TreeEntry>::new();
     for file in rendered {
-        let destination = root.join(&file.destination);
-        let existing = desired
-            .get(&file.destination)
-            .cloned()
-            .or_else(|| fs::read(&destination).ok());
-        let target_exists = existing.is_some();
-
-        match file.strategy {
-            FileStrategy::Skip => {
-                plan.changes.push(PlannedChange {
-                    kind: ChangeKind::Skip,
-                    path: file.destination.clone(),
-                    recipe: file.recipe.clone(),
-                    contents: None,
-                });
-            }
-            FileStrategy::Create => {
-                if let Some(current) = existing {
-                    if current != file.contents {
-                        return Err(ScafflareError::FileConflict {
-                            path: file.destination.clone(),
-                            reason: format!(
-                                "recipe `{}` uses create but the file already exists",
-                                file.recipe
-                            ),
-                        });
-                    }
-                    plan.changes.push(PlannedChange {
-                        kind: ChangeKind::Unchanged,
-                        path: file.destination.clone(),
-                        recipe: file.recipe.clone(),
-                        contents: None,
-                    });
-                } else {
-                    desired.insert(file.destination.clone(), file.contents.clone());
-                    owners.insert(file.destination.clone(), file.recipe.clone());
-                }
-            }
-            FileStrategy::Fail => {
-                if target_exists {
+        if matches!(file.strategy, FileStrategy::Skip) {
+            continue;
+        }
+        let existing = tree.remove(&file.destination);
+        let entry = match (&file.strategy, existing) {
+            (FileStrategy::Skip, _) => unreachable!("skip files are filtered above"),
+            (FileStrategy::Create, Some(current)) => {
+                if normalize_eol(&current.contents) != normalize_eol(&file.contents) {
                     return Err(ScafflareError::FileConflict {
                         path: file.destination.clone(),
-                        reason: format!("recipe `{}` requires this path not to exist", file.recipe),
+                        reason: format!(
+                            "recipe `{}` uses create but another recipe already rendered different content",
+                            file.recipe
+                        ),
                     });
                 }
-                desired.insert(file.destination.clone(), file.contents.clone());
-                owners.insert(file.destination.clone(), file.recipe.clone());
+                with_owner(current, &file.recipe)
             }
-            FileStrategy::Replace => {
-                let kind = if target_exists {
-                    ChangeKind::Update
-                } else {
-                    ChangeKind::Create
-                };
-                if existing.as_deref() == Some(file.contents.as_slice()) {
-                    plan.changes.push(PlannedChange {
-                        kind: ChangeKind::Unchanged,
-                        path: file.destination.clone(),
-                        recipe: file.recipe.clone(),
-                        contents: None,
-                    });
-                } else {
-                    desired.insert(file.destination.clone(), file.contents.clone());
-                    owners.insert(file.destination.clone(), file.recipe.clone());
-                    plan.changes.push(PlannedChange {
-                        kind,
-                        path: file.destination.clone(),
-                        recipe: file.recipe.clone(),
-                        contents: None,
-                    });
-                }
+            (FileStrategy::Fail, Some(_)) => {
+                return Err(ScafflareError::FileConflict {
+                    path: file.destination.clone(),
+                    reason: format!("recipe `{}` requires this path not to exist", file.recipe),
+                });
             }
-            FileStrategy::MergeJson => {
-                let left = match existing {
-                    Some(ref bytes) => parse_json(&file.destination, bytes)?,
+            (FileStrategy::MergeJson, current) => {
+                let left = match &current {
+                    Some(entry) => parse_json(&file.destination, &entry.contents)?,
                     None => Value::Object(Default::default()),
                 };
                 let right = parse_json(&file.destination, &file.contents)?;
-                let merged = deep_merge(left, right);
-                let contents = serde_json::to_vec_pretty(&merged)
-                    .map_err(|error| ScafflareError::Serialization(error.to_string()))?
-                    .into_iter()
-                    .chain(std::iter::once(b'\n'))
-                    .collect::<Vec<_>>();
-                if existing.as_deref() == Some(contents.as_slice()) {
-                    plan.changes.push(PlannedChange {
-                        kind: ChangeKind::Unchanged,
-                        path: file.destination.clone(),
-                        recipe: file.recipe.clone(),
-                        contents: None,
-                    });
-                } else {
-                    desired.insert(file.destination.clone(), contents);
-                    owners.insert(file.destination.clone(), file.recipe.clone());
-                    plan.changes.push(PlannedChange {
-                        kind: if target_exists {
-                            ChangeKind::Update
-                        } else {
-                            ChangeKind::Create
-                        },
-                        path: file.destination.clone(),
-                        recipe: file.recipe.clone(),
-                        contents: None,
-                    });
-                }
+                let contents = serialize_json(&deep_merge(left, right))?;
+                let mut entry = current.unwrap_or_else(|| TreeEntry {
+                    contents: Vec::new(),
+                    owners: Vec::new(),
+                    strategy: FileStrategy::MergeJson,
+                    json: true,
+                });
+                entry.contents = contents;
+                entry.strategy = FileStrategy::MergeJson;
+                entry.json = true;
+                with_owner(entry, &file.recipe)
             }
-        }
-    }
-
-    // A composed target may be touched by several recipes (notably package.json).
-    // Keep only one terminal write per path, containing the fully merged result.
-    plan.changes
-        .retain(|change| !matches!(change.kind, ChangeKind::Create | ChangeKind::Update));
-    for (path, contents) in desired {
-        let target = root.join(&path);
-        let kind = match fs::read(&target) {
-            Ok(existing) if existing == contents => ChangeKind::Unchanged,
-            Ok(_) => ChangeKind::Update,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => ChangeKind::Create,
-            Err(error) => return Err(ScafflareError::io(&target, error)),
+            (strategy, current) => {
+                let owners = current.map(|entry| entry.owners).unwrap_or_default();
+                with_owner(
+                    TreeEntry {
+                        contents: file.contents.clone(),
+                        owners,
+                        strategy: strategy.clone(),
+                        json: false,
+                    },
+                    &file.recipe,
+                )
+            }
         };
-        let recipe = owners.remove(&path).unwrap_or_else(|| "unknown".to_owned());
-        plan.changes.push(PlannedChange {
-            kind,
-            path,
-            recipe,
-            contents: if kind == ChangeKind::Unchanged {
-                None
-            } else {
-                Some(contents)
-            },
-        });
+        tree.insert(file.destination.clone(), entry);
     }
-
-    for change in &mut plan.changes {
-        if change.contents.is_none()
-            && matches!(change.kind, ChangeKind::Create | ChangeKind::Update)
-        {
-            if let Some(contents) = desired_contents(root, rendered, &change.path)? {
-                change.contents = Some(contents);
-            }
-        }
-    }
-    plan.changes.sort_by(|left, right| {
-        left.path
-            .cmp(&right.path)
-            .then(left.recipe.cmp(&right.recipe))
-    });
-    Ok(plan)
+    Ok(tree)
 }
 
-fn desired_contents(
-    root: &Path,
-    rendered: &[RenderedFile],
-    target: &Path,
-) -> Result<Option<Vec<u8>>> {
-    let mut value = fs::read(root.join(target)).ok();
-    for file in rendered.iter().filter(|file| file.destination == target) {
-        match file.strategy {
-            FileStrategy::Skip => {}
-            FileStrategy::Create | FileStrategy::Fail | FileStrategy::Replace => {
-                value = Some(file.contents.clone())
-            }
-            FileStrategy::MergeJson => {
-                let left = match value {
-                    Some(bytes) => parse_json(target, &bytes)?,
-                    None => Value::Object(Default::default()),
-                };
-                let merged = deep_merge(left, parse_json(target, &file.contents)?);
-                value = Some(
-                    serde_json::to_vec_pretty(&merged)
-                        .map_err(|error| ScafflareError::Serialization(error.to_string()))?
-                        .into_iter()
-                        .chain(std::iter::once(b'\n'))
-                        .collect(),
-                );
-            }
-        }
+fn with_owner(mut entry: TreeEntry, recipe: &str) -> TreeEntry {
+    if !entry.owners.iter().any(|owner| owner == recipe) {
+        entry.owners.push(recipe.to_owned());
+        entry.owners.sort();
     }
-    Ok(value)
+    entry
 }
 
-fn parse_json(path: &Path, bytes: &[u8]) -> Result<Value> {
+/// Pretty JSON with a trailing newline, the canonical on-disk form.
+pub fn serialize_json(value: &Value) -> Result<Vec<u8>> {
+    let mut bytes = serde_json::to_vec_pretty(value)
+        .map_err(|error| ScafflareError::Serialization(error.to_string()))?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+pub(crate) fn parse_json(path: &Path, bytes: &[u8]) -> Result<Value> {
     serde_json::from_slice(bytes).map_err(|error| ScafflareError::FileConflict {
         path: path.to_path_buf(),
         reason: format!("valid JSON is required for merge_json: {error}"),
     })
+}
+
+/// Unified diff of a planned write against the file currently on disk.
+/// Returns `None` for binary content or when nothing differs.
+pub fn unified_diff(root: &Path, change: &PlannedChange) -> Option<String> {
+    let new = std::str::from_utf8(change.contents.as_ref()?).ok()?;
+    let old_bytes = std::fs::read(root.join(&change.path)).unwrap_or_default();
+    let old = std::str::from_utf8(&old_bytes).ok()?;
+    if old == new {
+        return None;
+    }
+    let name = change.path.to_string_lossy().replace('\\', "/");
+    let mut options = diffy::DiffOptions::new();
+    options.set_original_filename(format!("a/{name}"));
+    options.set_modified_filename(format!("b/{name}"));
+    Some(options.create_patch(old, new).to_string())
 }
 
 pub fn deep_merge(left: Value, right: Value) -> Value {
@@ -279,20 +202,83 @@ mod tests {
         );
     }
 
+    fn rendered(recipe: &str, dest: &str, strategy: FileStrategy, body: &str) -> RenderedFile {
+        RenderedFile {
+            recipe: recipe.to_owned(),
+            destination: PathBuf::from(dest),
+            strategy,
+            contents: body.as_bytes().to_vec(),
+        }
+    }
+
     #[test]
-    fn is_idempotent_for_existing_create_content() {
-        let temporary = tempfile::tempdir().unwrap();
-        fs::write(temporary.path().join("same.txt"), "same").unwrap();
-        let plan = plan_files(
-            temporary.path(),
-            &[RenderedFile {
-                recipe: "test".to_owned(),
-                destination: PathBuf::from("same.txt"),
-                strategy: FileStrategy::Create,
-                contents: b"same".to_vec(),
-            }],
-        )
+    fn identical_create_from_two_recipes_has_two_owners() {
+        let tree = render_tree(&[
+            rendered("a", "x.txt", FileStrategy::Create, "same"),
+            rendered("b", "x.txt", FileStrategy::Create, "same"),
+        ])
         .unwrap();
-        assert_eq!(plan.changes[0].kind, ChangeKind::Unchanged);
+        assert_eq!(tree[Path::new("x.txt")].owners, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn differing_create_from_two_recipes_conflicts() {
+        let result = render_tree(&[
+            rendered("a", "x.txt", FileStrategy::Create, "one"),
+            rendered("b", "x.txt", FileStrategy::Create, "two"),
+        ]);
+        assert!(matches!(result, Err(ScafflareError::FileConflict { .. })));
+    }
+
+    #[test]
+    fn merge_json_fragments_compose_without_touching_disk() {
+        let tree = render_tree(&[
+            rendered(
+                "a",
+                "package.json",
+                FileStrategy::MergeJson,
+                r#"{"scripts":{"a":"1"}}"#,
+            ),
+            rendered(
+                "b",
+                "package.json",
+                FileStrategy::MergeJson,
+                r#"{"scripts":{"b":"2"}}"#,
+            ),
+        ])
+        .unwrap();
+        let entry = &tree[Path::new("package.json")];
+        assert!(entry.json);
+        let value: Value = serde_json::from_slice(&entry.contents).unwrap();
+        assert_eq!(value, serde_json::json!({"scripts":{"a":"1","b":"2"}}));
+        assert!(entry.contents.ends_with(b"\n"));
+    }
+
+    #[test]
+    fn skip_is_ignored_and_fail_rejects_second_writer() {
+        let tree = render_tree(&[rendered("a", "s.txt", FileStrategy::Skip, "x")]).unwrap();
+        assert!(tree.is_empty());
+        let result = render_tree(&[
+            rendered("a", "f.txt", FileStrategy::Create, "x"),
+            rendered("b", "f.txt", FileStrategy::Fail, "x"),
+        ]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn replace_overrides_earlier_content() {
+        let tree = render_tree(&[
+            rendered("a", "r.txt", FileStrategy::Create, "old"),
+            rendered("b", "r.txt", FileStrategy::Replace, "new"),
+        ])
+        .unwrap();
+        assert_eq!(tree[Path::new("r.txt")].contents, b"new");
+        assert_eq!(tree[Path::new("r.txt")].owners, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn invalid_json_fragment_is_a_conflict_not_a_panic() {
+        let result = render_tree(&[rendered("a", "p.json", FileStrategy::MergeJson, "{nope")]);
+        assert!(matches!(result, Err(ScafflareError::FileConflict { .. })));
     }
 }
