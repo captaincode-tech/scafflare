@@ -93,6 +93,10 @@ run_upgrade_fixture hono-layered \
 printf '\n=== Smoke test on shipped version 1 lockfile example ===\n'
 cp -R "$ROOT/examples/clean-express-todo" "$WORKDIR/example"
 "$BIN" status --directory "$WORKDIR/example" >/dev/null
-"$BIN" upgrade --dry-run --directory "$WORKDIR/example" >/dev/null
+# The example is a version 1 lockfile project whose dependencies are bumped independently
+# (for example by Dependabot), so a reported conflict (exit 2) is legitimate; anything else is not.
+code=0
+"$BIN" upgrade --dry-run --directory "$WORKDIR/example" >/dev/null 2>&1 || code=$?
+[[ $code -eq 0 || $code -eq 2 ]] || fail "dry-run on the version 1 example exited with $code"
 
 printf '\nAll upgrade fixture gates passed.\n'
